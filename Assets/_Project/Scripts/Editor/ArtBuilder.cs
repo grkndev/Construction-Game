@@ -81,14 +81,14 @@ namespace Game.Editor
 
         // ---------- UI sprite ----------
 
-        public const string RoundedSpritePath = "Assets/_Project/UI/RoundedRect.png";
+        public const string RoundedSpritePath = "Assets/_Project/UI/Panel.png";
 
-        /// <summary>9-sliced rounded rectangle for panels and buttons (generated, no external art needed).</summary>
+        /// <summary>9-sliced rectangle with a slight corner radius for panels and buttons (generated, no external art needed).</summary>
         public static Sprite EnsureRoundedSprite()
         {
             if (!File.Exists(RoundedSpritePath))
             {
-                const int size = 96, radius = 36;
+                const int size = 48, radius = 10;   // small radius: reads as a rectangle, not a pill
                 var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
                 for (var y = 0; y < size; y++)
                 for (var x = 0; x < size; x++)
@@ -103,9 +103,19 @@ namespace Game.Editor
                 Object.DestroyImmediate(tex);
                 AssetDatabase.ImportAsset(RoundedSpritePath);
 
-                var importer = (TextureImporter)AssetImporter.GetAtPath(RoundedSpritePath);
+            }
+
+            // Checked on every run (not only on creation): with spriteImportMode Multiple (Unity's default for a
+            // fresh sprite) the importer-level border is silently ignored and the image is just stretched.
+            const int border = 12;
+            var importer = (TextureImporter)AssetImporter.GetAtPath(RoundedSpritePath);
+            var wanted = new Vector4(border, border, border, border);
+            if (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single ||
+                importer.spriteBorder != wanted)
+            {
                 importer.textureType = TextureImporterType.Sprite;
-                importer.spriteBorder = new Vector4(radius, radius, radius, radius);
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.spriteBorder = wanted;
                 importer.alphaIsTransparency = true;
                 importer.mipmapEnabled = false;
                 importer.SaveAndReimport();

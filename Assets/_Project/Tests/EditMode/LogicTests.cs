@@ -304,8 +304,8 @@ namespace Game.Tests
         {
             var baseSettings = Balance.WorkerEnergy;
             var l5 = Balance.WithStamina(baseSettings, 5);
-            Assert.AreEqual(baseSettings.Max * 1.75f, l5.Max, 1e-3);
-            Assert.AreEqual(baseSettings.FullRegen * 1.5f, l5.FullRegen, 1e-3);
+            Assert.AreEqual(baseSettings.Max * 2.0f, l5.Max, 1e-3);
+            Assert.AreEqual(baseSettings.FullRegen * 1.75f, l5.FullRegen, 1e-3);
             Assert.AreEqual(baseSettings.Cost, l5.Cost);
             Assert.AreEqual(baseSettings.ResumeFraction, l5.ResumeFraction);
         }
@@ -322,6 +322,15 @@ namespace Game.Tests
             }
             Assert.Greater(Hits(5), Hits(0));
             Assert.Greater(Hits(10), Hits(5));
+        }
+
+        [Test]
+        public void EveryStaminaLevel_IsAClearlyFeltStep_ForThePlayer()
+        {
+            // The upgrade used to go unnoticed: each level must add at least a few hits per full bar.
+            for (var level = 0; level < Balance.MaxStaminaLevel; level++)
+                Assert.GreaterOrEqual(Balance.HitsPerBar(Balance.PlayerEnergy, level + 1) - Balance.HitsPerBar(Balance.PlayerEnergy, level), 4,
+                    $"level {level} -> {level + 1}");
         }
 
         [Test]

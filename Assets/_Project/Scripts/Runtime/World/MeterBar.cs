@@ -38,6 +38,9 @@ namespace Game.World
             return bar;
         }
 
+        /// <summary>Stamina upgrades make the bar physically longer so the extra capacity is visible.</summary>
+        public void SetWidthScale(float scale) => transform.localScale = new Vector3(scale, 1f, 1f);
+
         /// <summary>Red when nearly empty or exhausted so "I need to rest" is readable at a glance.</summary>
         public void Set(float fraction, bool exhausted)
         {

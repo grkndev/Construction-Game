@@ -31,10 +31,13 @@ namespace Game.Core
 
         // ---- Stamina upgrade: every level makes ALL characters' bars bigger and faster to refill.
         public const int MaxStaminaLevel = 10;
-        const float StaminaMaxPerLevel = 0.15f;
-        const float StaminaRegenPerLevel = 0.10f;
+        const float StaminaMaxPerLevel = 0.20f;
+        const float StaminaRegenPerLevel = 0.15f;
 
         public static UpgradeTrack NewStaminaTrack() => new UpgradeTrack(baseCost: 60, growth: 1.6, maxLevel: MaxStaminaLevel);
+
+        /// <summary>How many hits one full bar pays for at a stamina level; the unit the player actually feels.</summary>
+        public static int HitsPerBar(EnergySettings s, int level) => (int)(WithStamina(s, level).Max / s.Cost);
 
         public static EnergySettings WithStamina(EnergySettings s, int level) => new EnergySettings(
             s.Max * (1f + StaminaMaxPerLevel * level), s.Cost, s.FullRegen * (1f + StaminaRegenPerLevel * level),

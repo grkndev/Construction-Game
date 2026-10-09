@@ -162,7 +162,9 @@ namespace Game.Core
         {
             if (!Stamina.TryBuy(Economy)) return;
             foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.ApplyStamina(Stamina.Level);
-            ShowHint($"Dayanıklılık arttı! Herkesin enerjisi +%{Mathf.RoundToInt(Stamina.Level * 15f)} kapasite");
+            var hits = Balance.HitsPerBar(Balance.PlayerEnergy, Stamina.Level);
+            ShowHint($"Dayanıklılık arttı! Bir dolu enerji artık {hits} vuruş, herkes daha çabuk toparlanıyor.");
+            Popup($"DAYANIKLILIK Sv.{Stamina.Level}!", player.transform.position + Vector3.up * 3.6f, new Color(0.5f, 1f, 0.6f), 1.5f);
         }
 
         // ---------- Sarı Kola ----------

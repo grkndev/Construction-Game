@@ -5,14 +5,17 @@ using UnityEngine.UI;
 
 namespace Game.UI
 {
-    /// <summary>Screen-space HUD: coins, current building, energy bars, cola, upgrade buttons, hints. It only reads game state and calls Buy*/Use*.</summary>
+    /// <summary>Screen-space HUD: coins, current building, energy bar, cola, upgrade buttons, hints. It only reads game state and calls Buy*/Use*.</summary>
     public sealed class GameHud : MonoBehaviour
     {
+        const float EnergyBarMinWidth = 140f;   // bar width at base capacity; it grows with stamina so the upgrade is visible
+        const float EnergyBarMaxWidth = 344f;   // ...up to this width at the maximum stamina level
+
         [SerializeField] TMP_Text coinsText;
-        [SerializeField] TMP_Text buildingText;
-        [SerializeField] TMP_Text hintText;
-        [SerializeField] TMP_Text victoryText;
-        [SerializeField] TMP_Text boostText;
+        [SerializeField] UiPlate buildingPlate;
+        [SerializeField] UiPlate hintPlate;
+        [SerializeField] UiPlate victoryPlate;
+        [SerializeField] UiPlate boostPlate;
         [SerializeField] Button hammerButton;
         [SerializeField] TMP_Text hammerLabel;
         [SerializeField] Button workerButton;
@@ -23,6 +26,8 @@ namespace Game.UI
         [SerializeField] TMP_Text colaBuyLabel;
         [SerializeField] Button colaUseButton;
         [SerializeField] TMP_Text colaUseLabel;
+        [SerializeField] TMP_Text playerEnergyLabel;
+        [SerializeField] RectTransform playerEnergyBack;
         [SerializeField] RectTransform playerEnergyFill;
         [SerializeField] Image playerEnergyImage;
 
@@ -48,7 +53,7 @@ namespace Game.UI
             staminaButton.onClick.AddListener(game.BuyStamina);
             colaBuyButton.onClick.AddListener(game.BuyCola);
             colaUseButton.onClick.AddListener(game.UseCola);
-            victoryText.gameObject.SetActive(false);
+            victoryPlate.Text = "";
 
             ShowHint("WASD / sol çubuk: yürü    SPACE / tık / A: çekiç vur    İstediğin inşaata git!", 7f);
             Refresh();
@@ -69,7 +74,8 @@ namespace Game.UI
 
         void ShowHint(string text, float seconds)
         {
-            hintText.text = text;
+            hintPlate.Text = text;
+            hintPlate.Alpha = 1f;
             hintTimer = seconds;
         }
 
@@ -80,21 +86,25 @@ namespace Game.UI
             if (hintTimer > 0f)
             {
                 hintTimer -= Time.deltaTime;
-                hintText.alpha = Mathf.Clamp01(hintTimer * 2f);
+                hintPlate.Alpha = Mathf.Clamp01(hintTimer * 2f);
+                if (hintTimer <= 0f) hintPlate.Text = "";
             }
 
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
-            SetBar(playerEnergyFill, playerEnergyImage, game.PlayerEnergy.Fraction, game.PlayerEnergy.IsExhausted);
+            var energy = game.PlayerEnergy;
+            SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
+            playerEnergyLabel.text = $"ENERJİ  {Mathf.CeilToInt(energy.Value)} / {Mathf.RoundToInt(energy.Max)}";
+            var capacity = Mathf.InverseLerp(Balance.PlayerEnergy.Max,
+                Balance.WithStamina(Balance.PlayerEnergy, Balance.MaxStaminaLevel).Max, energy.Max);
+            playerEnergyBack.sizeDelta = new Vector2(Mathf.Lerp(EnergyBarMinWidth, EnergyBarMaxWidth, capacity), playerEnergyBack.sizeDelta.y);
 
-            var focus = game.FocusSite;
-
-            var buffed = game.Boost.IsActive || game.LevelBuff.IsActive;
-            boostText.gameObject.SetActive(buffed);
-            if (game.Boost.IsActive) boostText.text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";
-            else if (game.LevelBuff.IsActive) boostText.text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
+            if (game.Boost.IsActive) boostPlate.Text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";
+            else if (game.LevelBuff.IsActive) boostPlate.Text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
+            else boostPlate.Text = "";
 
             if (game.AllDone) return;
-            buildingText.text = focus != null
+            var focus = game.FocusSite;
+            buildingPlate.Text = focus != null
                 ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
                 : $"İnşaatlar  {game.CompletedCount}/{game.TotalCount}";
         }
@@ -120,9 +130,11 @@ namespace Game.UI
                 : $"İŞÇİ AL  ({game.Workers.Level}/{Balance.MaxWorkers})\n{NumberFormat.Compact(game.Workers.NextCost)}";
             workerButton.interactable = !game.Workers.IsMaxed && game.Economy.CanAfford(game.Workers.NextCost);
 
+            // Shows what the upgrade does in the unit the player feels: hits per full energy bar.
+            var now = Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level);
             staminaLabel.text = game.Stamina.IsMaxed
-                ? $"DAYANIKLILIK\nEn yüksek seviye"
-                : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\nEnerji +%15  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
+                ? $"DAYANIKLILIK\nEn yüksek • {now} vuruş"
+                : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\n{now} → {Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level + 1)} vuruş  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
             staminaButton.interactable = !game.Stamina.IsMaxed && game.Economy.CanAfford(game.Stamina.NextCost);
 
             colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
@@ -133,9 +145,8 @@ namespace Game.UI
 
             if (game.AllDone)
             {
-                buildingText.text = "";
-                victoryText.gameObject.SetActive(true);
-                victoryText.text = "Şehir tamamlandı!\nHarika iş çıkardın";
+                buildingPlate.Text = "";
+                victoryPlate.Text = "Şehir tamamlandı!\nHarika iş çıkardın";
             }
         }
     }

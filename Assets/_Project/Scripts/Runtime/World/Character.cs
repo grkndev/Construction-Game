@@ -38,7 +38,12 @@ namespace Game.World
         public void Refill() => Energy.Refill();
 
         /// <summary>Stamina upgrade: bigger bar, faster refill; keeps the current fill fraction.</summary>
-        public void ApplyStamina(int level) => Energy.Reconfigure(Balance.WithStamina(BaseSettings, level));
+        public void ApplyStamina(int level)
+        {
+            var settings = Balance.WithStamina(BaseSettings, level);
+            Energy.Reconfigure(settings);
+            energyBar.SetWidthScale(1f + (settings.Max / BaseSettings.Max - 1f) * 0.6f);   // half-way: visible, but not huge
+        }
 
         /// <summary>Called by the game when a cola effect starts or ends.</summary>
         public void SetBuffs(bool levelBonus, float speedMultiplier)

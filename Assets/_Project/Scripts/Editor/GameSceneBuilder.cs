@@ -335,24 +335,19 @@ namespace Game.Editor
             var coinsText = Label(coinPanel, "Coins", font, outlineMat, 58, Color.white, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0f, 0.5f), new Vector2(104f, 0f), new Vector2(250f, 90f));
 
-            var buildingText = Label(root, "BuildingText", font, outlineMat, 46, Color.white, TextAlignmentOptions.Center,
-                new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(1000f, 80f));
-
-            var hintText = Label(root, "Hint", font, outlineMat, 34, new Color(1f, 0.96f, 0.8f), TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0f), new Vector2(0f, 230f), new Vector2(1500f, 60f));
-
-            var victoryText = Label(root, "Victory", font, outlineMat, 110, new Color(1f, 0.86f, 0.25f), TextAlignmentOptions.Center,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(1500f, 300f));
+            // Every on-screen message sits on a translucent dark plate so it stays readable over any background.
+            var buildingPlate = TextPlate(root, "BuildingPlate", rounded, font, outlineMat, 46, Color.white, new Vector2(0.5f, 1f), new Vector2(0f, -40f));
+            var hintPlate = TextPlate(root, "HintPlate", rounded, font, outlineMat, 34, new Color(1f, 0.96f, 0.8f), new Vector2(0.5f, 0f), new Vector2(0f, 205f));
+            var victoryPlate = TextPlate(root, "VictoryPlate", rounded, font, outlineMat, 110, new Color(1f, 0.86f, 0.25f), new Vector2(0.5f, 0.5f), new Vector2(0f, 60f));
 
             // The player's energy (workers show theirs above their heads).
             var energyPanel = Panel(root, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -155f), new Vector2(380f, 84f));
-            EnergyRow(energyPanel, rounded, font, "ENERJİ", -8f, out _, out var playerFill, out var playerFillImage);
+            EnergyRow(energyPanel, rounded, font, "ENERJİ", -8f, out var energyLabel, out var energyBack, out var playerFill, out var playerFillImage);
 
             var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(0f, 1f), new Vector2(40f, -255f), new Vector2(380f, 84f),
                 new Color(1f, 0.84f, 0.2f), 32, out var colaUseLabel);
 
-            var boostText = Label(root, "Boost", font, outlineMat, 60, new Color(1f, 0.6f, 0.15f), TextAlignmentOptions.Center,
-                new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(900f, 80f));
+            var boostPlate = TextPlate(root, "BoostPlate", rounded, font, outlineMat, 52, new Color(1f, 0.65f, 0.2f), new Vector2(0.5f, 1f), new Vector2(0f, -130f));
 
             var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-645f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
             var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(-215f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
@@ -361,10 +356,10 @@ namespace Game.Editor
 
             var hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "coinsText", coinsText);
-            EditorWire.Set(hud, "buildingText", buildingText);
-            EditorWire.Set(hud, "hintText", hintText);
-            EditorWire.Set(hud, "victoryText", victoryText);
-            EditorWire.Set(hud, "boostText", boostText);
+            EditorWire.Set(hud, "buildingPlate", buildingPlate);
+            EditorWire.Set(hud, "hintPlate", hintPlate);
+            EditorWire.Set(hud, "victoryPlate", victoryPlate);
+            EditorWire.Set(hud, "boostPlate", boostPlate);
             EditorWire.Set(hud, "hammerButton", hammerButton);
             EditorWire.Set(hud, "hammerLabel", hammerLabel);
             EditorWire.Set(hud, "workerButton", workerButton);
@@ -375,6 +370,8 @@ namespace Game.Editor
             EditorWire.Set(hud, "colaBuyLabel", colaBuyLabel);
             EditorWire.Set(hud, "colaUseButton", colaUseButton);
             EditorWire.Set(hud, "colaUseLabel", colaUseLabel);
+            EditorWire.Set(hud, "playerEnergyLabel", energyLabel);
+            EditorWire.Set(hud, "playerEnergyBack", energyBack);
             EditorWire.Set(hud, "playerEnergyFill", playerFill);
             EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
             return hud;
@@ -398,7 +395,6 @@ namespace Game.Editor
             var img = rt.gameObject.AddComponent<Image>();
             img.sprite = sprite;
             img.type = Image.Type.Sliced;
-            img.pixelsPerUnitMultiplier = 1.6f;   // tighter corner radius
             img.color = color;
             img.raycastTarget = false;
             return rt;
@@ -444,7 +440,6 @@ namespace Game.Editor
             var img = rt.gameObject.AddComponent<Image>();
             img.sprite = sprite;
             img.type = Image.Type.Sliced;
-            img.pixelsPerUnitMultiplier = 1.6f;
             var button = rt.gameObject.AddComponent<Button>();
             button.targetGraphic = img;
             button.colors = new ColorBlock
@@ -463,9 +458,39 @@ namespace Game.Editor
             return button;
         }
 
+        // Dark translucent plate that grows with its text: Image + layout components, text as the only child.
+        static UiPlate TextPlate(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Material material, float fontSize,
+            Color textColor, Vector2 anchor, Vector2 pos)
+        {
+            var rt = Rect(parent, name, anchor, pos, Vector2.zero);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.sprite = sprite;
+            img.type = Image.Type.Sliced;
+            img.color = new Color(0f, 0f, 0f, 0.5f);
+            img.raycastTarget = false;
+
+            var layout = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(28, 28, 10, 12);
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            var fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var label = Label(rt, "Text", font, material, fontSize, textColor, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(100f, 50f));
+            label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            label.text = " ";
+            var plate = rt.gameObject.AddComponent<UiPlate>();
+            EditorWire.Set(plate, "label", label);
+            return plate;
+        }
+
         // Label on top, bar underneath; the fill stretches to its back image so the HUD can drive it with anchorMax.x.
         static void EnergyRow(Transform panel, Sprite rounded, TMP_FontAsset font, string title, float y,
-            out TMP_Text label, out RectTransform fill, out Image fillImage)
+            out TMP_Text label, out RectTransform backRect, out RectTransform fill, out Image fillImage)
         {
             label = Label(panel, title + "Label", font, null, 26, Color.white, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0f, 1f), new Vector2(18f, y), new Vector2(340f, 32f));
@@ -474,9 +499,10 @@ namespace Game.Editor
             var backImg = back.gameObject.AddComponent<Image>();
             backImg.sprite = rounded;
             backImg.type = Image.Type.Sliced;
-            backImg.pixelsPerUnitMultiplier = 4f;
+            backImg.pixelsPerUnitMultiplier = 2f;   // bars are only 24 px tall: halve the border so the corners stay slight
             backImg.color = new Color(0.08f, 0.06f, 0.12f, 0.9f);
             backImg.raycastTarget = false;
+            backRect = back;
 
             fill = Rect(back, "Fill", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
             fill.pivot = new Vector2(0f, 0.5f);

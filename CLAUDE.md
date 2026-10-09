@@ -11,6 +11,7 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Her vuruş = ilerleme + o kadar para. Bina kat kat yükselir, bitince bonus ve konfeti. Sıradaki plot açılır.
 - 5 plotun hepsi baştan açık; oyuncu menzildeki en yakın plota vurur, işçiler en az işçisi olan plota dağılır.
 - **Enerji:** her karakterin (oyuncu ve her işçi) kendi enerjisi var, kafasının üstündeki barda görünür (oyuncununki ayrıca HUD'da). Vuruş enerji harcar, durunca dolar; bitince %40'a dolana kadar o karakter bekler. Plotların enerjisi yok. Bunun kodu `World/Character.cs` (yeni karakter türü = bu bileşeni eklemek).
+- Dayanıklılık etkisi **görünür** olmalı: HUD enerji çubuğu kapasiteyle uzar, sayıyla yazar, buton "25 → 30 vuruş" gösterir (`Balance.HitsPerBar`), karakter çubukları da uzar.
 - **Sarı Kola:** adada rastgele belirir, üstünden geçince cebe girer (en çok 3), **E / gamepad X** ile içilir → **tüm karakterlerin** enerjisi dolar ve 10 sn boyunca vuruş gücü "seviye +5" gibi hesaplanır (ayaklarında altın halka). Parayla alınan kola hemen içilir ve 15 sn **Coşku** verir: aynı +5 seviye, ayrıca herkes ×1.5 hızlı yürür/vurur ve kimse enerji harcamaz.
 - Parayla: **Çekiç** (vuruş gücü), **İşçi** (otomatik çalışan yardımcı, en çok 8), **Dayanıklılık** (tüm karakterlerin enerji kapasitesi +%15 ve yenilenme +%10 / seviye, en çok 10) ve **Sarı Kola**.
 - 5 bina bitince "Şehir tamamlandı" görünür.
@@ -18,7 +19,8 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 ## Görsel stil
 - Primitive'lerden üretilmiş, düz parlak renkler; kendi yazdığımız **toon shader** (`Art/Shaders/Toon.shader`: bantlı ışık, mor gölge tonu, ters-hull outline).
 - Her materyal `ArtBuilder` ile üretilir, hepsi `Data/ToonPalette.asset` içinde toplanır. Yeni renk = `ArtBuilder.BuildPalette`.
-- Font: Paytone One (OFL, Türkçe karakterleri tam). UI: TextMeshPro + UGUI, 1920x1080 referans, match 0.5.
+- Font: Paytone One (OFL, Türkçe karakterleri tam). UI: TextMeshPro + UGUI, 1920x1080 referans, match 0.5. Ekran yazıları `UiPlate` (yarı saydam siyah zemin, yazıyla büyür); paneller/butonlar `UI/Panel.png` (hafif köşeli dikdörtgen, 9-slice).
+- Sprite gotcha: `spriteImportMode` **Single** olmalı, Multiple'da importer border'ı yok sayılır ve 9-slice görsel elips gibi gerilir (`ArtBuilder.EnsureRoundedSprite` her çalıştırmada doğrular).
 - Yüksek kalite ışık/texture kapsam dışı. Kamera: izometrik takip (`IsoCameraFollow`).
 
 ## Komutlar (hepsi batchmode, editör kapalı olmalı)

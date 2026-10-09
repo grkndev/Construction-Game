@@ -34,6 +34,7 @@ namespace Game.Core
         float sinceSpent;
 
         public float Value { get; private set; }
+        public float Max => settings.Max;
         public float Fraction => Value / settings.Max;
         public bool IsExhausted { get; private set; }
         public bool CanSpend => !IsExhausted && Value >= settings.Cost;
