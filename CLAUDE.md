@@ -1,124 +1,41 @@
-# İnşaat İşçisi Oyunu — Proje Bağlamı
+# Construction — proje bağlamı
+
+Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "görev/süre/NPC" tasarımı iptal edildi.
 
 ## Ortam
-- Unity editör: `UNITY="/Volumes/ExternalSSD/Unity/6000.6.5f1/Unity.app/Contents/MacOS/Unity"`
-- Proje kökü: `/Volumes/ExternalSSD/Unity/Projects/Construction` (harici SSD, APFS)
-- Geliştirme makinesi: MacBook Air M4. Windows makinesine erişim yok.
+- Unity editör: `/Volumes/ExternalSSD/Unity/6000.6.5f1/Unity.app/Contents/MacOS/Unity` (sistemdeki tek kurulum). Script'ler `UNITY=...` ile override edilebilir.
+- Proje kökü: `/Volumes/ExternalSSD/Unity/Projects/Construction`. Geliştirme makinesi MacBook Air M4, Windows erişimi yok.
 
 ## Oyun
-Casual 3D oyun. Oyuncu bir inşaat işçisi ve süre dolmadan inşaat görevlerini bitirmeye çalışıyor.
+- Küçük bir adada 5 inşaat alanı (plot). İşçiyi WASD / sol çubukla gezdir, aktif alanda **Space / sol tık / gamepad A** ile çekiç vur.
+- Her vuruş = ilerleme + o kadar para. Bina kat kat yükselir, bitince bonus ve konfeti. Sıradaki plot açılır.
+- Parayla: **Çekiç** (vuruş gücü) ve **İşçi** (otomatik çalışan yardımcı, en çok 8) yükseltmeleri.
+- 5 bina bitince "Şehir tamamlandı" görünür.
 
-Döngü:
-1. HUD aktif görevleri gösterir. Aynı anda 2–3 görev açıktır, sırayı oyuncu seçer.
-2. Oyuncu araç deposundan (`ToolRack`) gerekli aracı alır. Tek elde tek araç taşınır ve taşırken hız düşer (araca göre değişir).
-3. Aracı görev alanına (`TaskSite`) götürür. Among Us tarzı kısa (5–15 sn) bir 2D mini görev açılır.
-4. Başarılı olursa bina bir aşama yükselir (tween ile) ve süreye bonus eklenir.
-5. Sahada:
-   - **Enerji içecekleri:** Havada dönüp zıplayan pickup'lar, süreli hız buff'ı verir.
-   - **Yavaşlatan NPC'ler:** Yakınlarındayken oyuncunun hızı düşer, çarparlarsa taşınan araç düşer, etkileşimle sahadan kovulurlar.
+## Görsel stil
+- Primitive'lerden üretilmiş, düz parlak renkler; kendi yazdığımız **toon shader** (`Art/Shaders/Toon.shader`: bantlı ışık, mor gölge tonu, ters-hull outline).
+- Her materyal `ArtBuilder` ile üretilir, hepsi `Data/ToonPalette.asset` içinde toplanır. Yeni renk = `ArtBuilder.BuildPalette`.
+- Font: Paytone One (OFL, Türkçe karakterleri tam). UI: TextMeshPro + UGUI, 1920x1080 referans, match 0.5.
+- Yüksek kalite ışık/texture kapsam dışı. Kamera: izometrik takip (`IsoCameraFollow`).
 
-Görsel stil:
-- Blok/tuğla stili low-poly, düz renk paleti (6–8 renk), hafif parlak plastik materyal.
-- Tek `DirectionalLight` ve basit gölge.
-- Yüksek kaliteli ışık ve texture kapsam dışı.
-- "LEGO" markası ve logolu tuğla tasarımı hiçbir yerde kullanılmaz.
-
-## Platform ve teknoloji
-- **Motor:** Unity 6 LTS, URP.
-- **Hedefler:**
-  - macOS: IL2CPP, Universal
-  - Windows x64: Mono (Mac'ten IL2CPP ile Windows build'i alınamıyor)
-  - WebGL: ikincil hedef, test ve paylaşım için
-  - Mobil hedef yok.
-- **Input:** Input System, `Player` ve `UI` olmak üzere iki action map. Klavye/mouse ve gamepad aynı action'lara bağlı.
-- **UI:** UGUI + TextMeshPro. Canvas Scaler: Scale With Screen Size, match 0.5. Hem 16:10 hem 16:9 oranında doğru görünmeli.
-- **Tween:** DOTween (OpenUPM üzerinden). Kurulamazsa dur ve bana sor.
-- **Kamera:** Cinemachine. Varsayılan izometrik/yukarıdan takip kamerası. Third-person'a geçiş kolay olmalı, çünkü bu karar henüz kesin değil.
-- **NPC yol bulma:** AI Navigation (NavMesh).
-
-## Platform kısıtları (her kodda geçerli)
-- **Thread kullanılmaz** (WebGL desteklemiyor): `Task.Run`, `Thread` yok. Coroutine ve ana thread'de async/await serbest.
-- **Dosya yolları:** Kayıt için yalnızca `Application.persistentDataPath`. Yollar `Path.Combine` ile birleştirilir, hardcoded yol yok.
-- **İsimlendirme:** Dosya ve klasör adlarında büyük/küçük harf tutarlı olmalı.
-- **Platforma özel kod:** `#if UNITY_...` blokları ile ve tek bir yerde toplanır.
+## Komutlar (hepsi batchmode, editör kapalı olmalı)
+- `scripts/setup.sh [rebuild]` — TMP + ayarlar + sahne/prefab/materyal üretimi. `rebuild` sahneyi sıfırdan yazar.
+- `scripts/compile.sh` — derle. `scripts/test.sh` — EditMode testleri.
+- `scripts/build.sh mac|web` — build (`mac fast` = Mono, sadece hızlı görsel kontrol). `win` yazılı ama Windows modülü kurulu değil, denenmedi.
+- Loglar `Logs/` altında; `error CS` ya da hata kodu varsa script ≠ 0 döner.
+- Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [-demo]` (oyunun kendi karesini yazar, `-demo` otomatik oynar). Masaüstü ekran görüntüsü alma.
 
 ## Mimari
+- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te.
+- `GameController` sahnenin kompozisyon kökü; singleton yok, referanslar sahnede `EditorWire` ile bağlanır.
+- `Player/`, `World/`, `UI/` MonoBehaviour katmanı. Yeni içerik (bina) = `Balance.Plans`'e satır.
+- Tween için DOTween yok (OpenUPM'den kalkmış); `Easing.cs` + Update tabanlı animasyonlar.
 
-### Veri (ScriptableObject)
-- `ToolData`: id, prefab, icon, carrySpeedMultiplier
-- `TaskData`: requiredTool, miniGamePrefab, timeReward, buildStage referansı
-
-Yeni içerik eklemek kod değil veri gerektirmeli.
-
-### Bileşenler
-- **`PlayerController`:** `CharacterController` tabanlı hareket.
-- **`PlayerCarry`:** El soketinde tek item tutar. `Pickup`/`Drop` işlemlerini yapar.
-- **`SpeedModifiers`:** Tüm hız buff ve debuff'larının (taşıma, içecek, NPC) toplandığı **tek** yer.
-- **`ToolRack`:** Aracı verir, gecikmeli olarak yeniden spawn eder.
-- **`TaskSite`:** Durum makinesi `Locked → WaitingForTool → InProgress → Done`.
-- **`MiniGame`:** Soyut sınıf. `Begin(TaskData)`, `event Action<bool> Completed`, `protected void Finish(bool success)`. Host, hangi somut görevin çalıştığını bilmez.
-- **`MiniGameHost`:** Mini görevi ayrı bir Canvas'ta oluşturur, input map'ini değiştirir, dünyayı duraklatır.
-- **`TaskDirector`:** Açık görevleri, bina aşamalarını, süreyi ve kazan/kaybet durumunu yönetir.
-- **Oyun durumu:** `Menu`, `Playing`, `MiniGame`, `Paused`, `GameOver`.
-- **`ObjectiveMarker` + ekran dışı HUD göstergesi:** `WorldToScreenPoint`, ekran kenarına clamp, yöne göre döndürme.
-
-### Kurallar
-- **Duraklatma `Time.timeScale` ile YAPILMAZ.** Kendi pause servisimiz (`IPausable`) kullanılır.
-  - Mini görev açıkken oyuncu ve NPC'ler durur, ama oyun süresi akmaya devam eder.
-  - UI tween'leri duraklatmadan etkilenmez.
-- **Sistemler arası iletişim:** C# event'leri ya da ScriptableObject event kanalları. Singleton kullanımı minimum tutulur, servisler tek bir bootstrap noktasında kurulur.
-- **Saf oyun mantığı** (süre, görev durumları, hız hesabı) MonoBehaviour'lardan ayrı, düz C# sınıflarında yazılır ve EditMode testleriyle test edilir.
-
-## Klasör ve assembly yapısı
-```
-Assets/_Project/
-  Scripts/Runtime/      (Game.Runtime.asmdef)
-    Core/ Player/ Tasks/ MiniGames/ NPC/ Pickups/ UI/
-  Scripts/Editor/       (Game.Editor.asmdef)
-  Tests/EditMode/       (Game.Tests.EditMode.asmdef)
-  Data/  Prefabs/  Scenes/  Art/  Audio/  UI/
-Assets/ThirdParty/      (üçüncü parti asset'ler)
-```
-
-## Claude Code çalışma kuralları
-- **`.unity`, `.prefab` ve `.asset` YAML dosyalarını elle oluşturma veya düzenleme.**
-  - Sahne, prefab ve ScriptableObject asset'leri Editor script'leriyle üretilir.
-  - Bu script'ler `[MenuItem]` olarak tanımlanır, `-batchmode -executeMethod` ile de çalıştırılabilir ve idempotent olur (tekrar çalıştırılınca aynı sonucu üretir).
-- **Derleme doğrulaması:** Her değişiklikten sonra batchmode ile derle. Logda `error CS` kalmamalı. Mantık değişikliklerinde EditMode testlerini de çalıştır.
-- **Editör açıkken** batchmode aynı projeyi açamaz. Bu durumda zorlamadan bana söyle.
-- **`.meta` dosyaları:** Asla silme veya elle üretme. Bir dosyayı taşırken `.meta` dosyasıyla birlikte taşı.
-- **Placeholder görseller:** Gerçek asset gelene kadar Unity primitive'leri ve düz renk materyaller kullanılır.
-- **Hazır asset kaydı:** Eklenen her hazır asset `CREDITS.md`'ye işlenir: ad, kaynak, link, lisans, kullanım yeri.
-- **Açıklama:** Önemli mimari kararlarda kısaca "neden"i yaz. Amacım motorun iç işleyişini de öğrenmek.
-- **Commit:** Küçük ve anlamlı commit'ler, conventional commits formatında.
-- **Milestone sonu:** Her milestone bitince dur, yapılanları özetle ve onay bekle.
-
-## Yol haritası
-- **M0 – Kurulum:**
-  - Paketlerin kurulumu.
-  - Force Text serialization ve Visible Meta Files ayarları.
-  - `.gitignore` ve `.gitattributes` (LFS).
-  - asmdef'ler ve klasör yapısı.
-  - Bootstrap ve Playground sahneleri.
-  - `scripts/compile.sh`, `scripts/test.sh`, `scripts/build.sh`.
-- **M1 – Dikey kesit:**
-  - Gri kutularla saha, oyuncu hareketi ve kamera.
-  - Tuğla `ToolRack` → duvar `TaskSite` → "tuğla diz" mini görevi (drag & snap) → duvar bir aşama yükselir.
-- **M2 – Görev sistemi:**
-  - Süre sayacı.
-  - 2–3 eşzamanlı görev.
-  - İşaretçi ve ekran dışı gösterge.
-  - Kazan/kaybet ekranı.
-- **M3 – Pickup'lar:** Enerji içeceği ve `SpeedModifiers` entegrasyonu.
-- **M4 – NPC'ler:**
-  - NavMesh ile hareket.
-  - "Dolaş → yapış → kaç" durum makinesi.
-  - Çarpınca aracı düşürme.
-  - Kovma etkileşimi.
-- **M5 – İçerik ve his:**
-  - İkinci mini görev: vida sık ya da su terazisi.
-  - Juice: screen shake, hit-stop, ses varyasyonu.
-- **M6 – Bitiş:**
-  - Menü, ayarlar, kayıt, duraklatma ekranı.
-  - macOS, Windows ve WebGL build'leri.
-  - GameCI ile GitHub Actions.
+## Çalışma kuralları
+- `.unity/.prefab/.asset` YAML'ı elle yazma; Editor script'iyle üret (`GameSceneBuilder`, `ArtBuilder`). `Ensure*` yalnızca eksik olanı üretir, `Rebuild*` zorlar (fileID'ler rastgele olduğu için gereksiz yeniden üretme git diff'ini kirletir).
+- `NewScene`'den **sonra** asset yükleme gotcha'sı: sahneyi önce oluştur, asset'leri sonra yükle (yoksa referanslar `fileID: 0` kaydolur).
+- `.meta` dosyalarını silme/elle üretme. Binary asset'ler Git LFS'te (`.gitattributes`).
+- Dosya yolu: yalnızca `Application.persistentDataPath` + `Path.Combine`. Thread yok (WebGL).
+- Hazır asset eklenince `CREDITS.md`'ye işle.
+- Commit: conventional commits, küçük ve anlamlı.
+- Mac IL2CPP + WebGL ana hedefler; Windows (Mono) sonra.
