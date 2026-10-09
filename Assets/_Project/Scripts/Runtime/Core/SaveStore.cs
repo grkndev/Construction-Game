@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace Game.Core
@@ -10,6 +11,11 @@ namespace Game.Core
     /// </summary>
     public sealed class SaveStore
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        static extern void SyncFiles();   // Plugins/WebGL/FileSync.jslib: flushes the in-memory file system to IndexedDB
+#endif
+
         readonly string path;
 
         public SaveStore(string path) => this.path = path;
@@ -45,6 +51,7 @@ namespace Game.Core
                 File.WriteAllText(temp, JsonUtility.ToJson(data));
                 if (File.Exists(path)) File.Delete(path);
                 File.Move(temp, path);
+                FlushToBrowserStorage();
                 return true;
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
@@ -54,9 +61,20 @@ namespace Game.Core
             }
         }
 
+        static void FlushToBrowserStorage()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            SyncFiles();
+#endif
+        }
+
         public void Delete()
         {
-            try { if (File.Exists(path)) File.Delete(path); }
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+                FlushToBrowserStorage();
+            }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
                 Debug.LogWarning($"[Save] Could not delete {path}: {e.Message}");
