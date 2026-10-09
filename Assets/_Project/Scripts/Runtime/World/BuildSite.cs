@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Game.World
 {
-    public enum SiteState { Active, Done }
+    public enum SiteState { Active, Done, Broken }
 
     /// <summary>
     /// One construction plot. The building is assembled from primitives at startup (floors, windows,
@@ -35,6 +35,8 @@ namespace Game.World
         TMP_Text label;
         GameObject scaffold;
         Transform roof;
+        Transform flag;
+        Renderer markerRenderer;
         readonly List<Transform> floors = new List<Transform>();
         float punch;
 
@@ -44,6 +46,10 @@ namespace Game.World
         public float Fraction => progress?.Fraction ?? 0f;
         public int FloorsBuilt => progress?.FloorsBuilt ?? 0;
         public int Work => progress?.Work ?? 0;
+        /// <summary>Under construction or waiting for a repair (false once the building is finished and fine).</summary>
+        public bool NeedsWork => state != SiteState.Done;
+        /// <summary>Kind of the current problem (1..Balance.RepairKinds), 0 when the building is fine.</summary>
+        public int Issue { get; private set; }
 
         public event Action<BuildSite> Completed;
 
@@ -131,7 +137,7 @@ namespace Game.World
             roof.localPosition = new Vector3(0f, totalHeight, 0f);
             Prim.Cube(roof, "Cap", new Vector3(0f, 0.17f, 0f), new Vector3(Width + 0.5f, 0.34f, Width + 0.5f), palette.roof);
             Prim.Cylinder(roof, "Pole", new Vector3(0.9f, 0.9f, 0.9f), new Vector3(0.08f, 0.55f, 0.08f), palette.scaffold);
-            Prim.Cube(roof, "Flag", new Vector3(1.2f, 1.25f, 0.9f), new Vector3(0.55f, 0.32f, 0.05f), palette.flag);
+            flag = Prim.Cube(roof, "Flag", new Vector3(1.2f, 1.25f, 0.9f), new Vector3(0.55f, 0.32f, 0.05f), palette.flag).transform;
             roof.gameObject.SetActive(false);
 
             BuildScaffold(Mathf.Min(totalHeight + 0.35f, MaxScaffoldHeight));
@@ -183,6 +189,7 @@ namespace Game.World
             }
 
             marker = Prim.Cube(barRoot, "Marker", new Vector3(0f, 1.5f, 0f), new Vector3(0.5f, 0.5f, 0.5f), palette.marker).transform;
+            markerRenderer = marker.GetComponent<Renderer>();
             marker.localRotation = Quaternion.Euler(45f, 0f, 45f);
             SetBarFraction(0f);
         }
@@ -192,10 +199,54 @@ namespace Game.World
             state = next;
             var active = next == SiteState.Active;
             var done = next == SiteState.Done;
+            var broken = next == SiteState.Broken;
             barRoot.gameObject.SetActive(!done);
-            marker.gameObject.SetActive(active);
-            scaffold.SetActive(!done);
-            if (label != null) label.alpha = 1f;
+            marker.gameObject.SetActive(active || broken);
+            scaffold.SetActive(active);
+            flag.localRotation = broken ? Quaternion.Euler(0f, 0f, 35f) : Quaternion.identity;   // a drooping flag reads as "something is wrong"
+            if (label != null)
+            {
+                label.alpha = 1f;
+                label.text = broken ? StoryBeats.Problem(plan.Name, Issue) : plan.Name;
+            }
+        }
+
+        /// <summary>
+        /// Gives a finished building a problem (kind 1..N) or fixes it (0). A broken building shows a coloured marker and a
+        /// repair bar, and is worked on like a plot under construction.
+        /// </summary>
+        public void SetIssue(int kind)
+        {
+            Issue = progress != null && progress.IsComplete ? kind : 0;
+            if (Issue == 0)
+            {
+                if (state == SiteState.Broken) SetState(SiteState.Done);
+                return;
+            }
+            markerRenderer.sharedMaterial = IssueMaterial(Issue);
+            SetBarFraction(0f);
+            SetState(SiteState.Broken);
+        }
+
+        /// <summary>One hammer hit while repairing: shows the repair progress (0..1) and the hit effect.</summary>
+        public void RepairHit(float fraction, Vector3 hitPoint)
+        {
+            SetBarFraction(fraction);
+            punch = 1f;
+            if (hitFx == null) return;
+            hitFx.transform.position = hitPoint;
+            hitFx.Emit(7);
+        }
+
+        Material IssueMaterial(int kind)
+        {
+            switch (kind)
+            {
+                case 1: return palette.window;   // leak: light blue
+                case 2: return palette.sea;      // broken pipe: deep blue
+                case 3: return palette.marker;   // wiring: yellow
+                default: return palette.cone;    // cracked wall: orange
+            }
         }
 
         /// <summary>Applies work and returns how much was used. 0 if the plot isn't the active one.</summary>

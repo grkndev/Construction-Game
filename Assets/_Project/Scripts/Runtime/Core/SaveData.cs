@@ -15,6 +15,7 @@ namespace Game.Core
         public int xp;
         public int cola;
         public long savedAtUtcTicks;
+        public bool openingSeen;
         public DistrictSave[] districts = new DistrictSave[0];
     }
 

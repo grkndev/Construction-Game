@@ -48,6 +48,7 @@ namespace Game.UI
             game.LeveledUp += OnLeveledUp;
             game.Level.Changed += Refresh;
             game.Hint += ShowHint;
+            game.Story += ShowHint;
 
             shop.Bind(game);
             shopButton.onClick.AddListener(shop.Toggle);
@@ -70,9 +71,6 @@ namespace Game.UI
                 boostPlate.Text = "";
                 return;
             }
-            ShowHint(Application.isMobilePlatform
-                ? "Ekran çubuğuyla yürü    İnşaata yaklaşınca otomatik çalışırsın"
-                : "WASD: yürü    İnşaata yaklaşınca otomatik çalışırsın    Mağaza: B    Kola: E", 5f);
         }
 
         void OnLeveledUp(int level)
@@ -91,6 +89,7 @@ namespace Game.UI
             game.LeveledUp -= OnLeveledUp;
             game.Level.Changed -= Refresh;
             game.Hint -= ShowHint;
+            game.Story -= ShowHint;
         }
 
         void ShowHint(string text) => ShowHint(text, 2.8f);

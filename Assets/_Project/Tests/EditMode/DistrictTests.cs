@@ -383,3 +383,36 @@ namespace Game.Tests
         }
     }
 }
+
+namespace Game.Tests
+{
+    public class StoryBeatsTests
+    {
+        [Test]
+        public void EveryDistrict_HasAnIntroLine()
+        {
+            Assert.AreEqual(Balance.Districts.Length, StoryBeats.DistrictIntro.Length);
+            foreach (var line in StoryBeats.DistrictIntro) Assert.IsNotEmpty(line);
+        }
+
+        [Test]
+        public void EveryRepairKind_HasAName()
+        {
+            Assert.AreEqual(Balance.RepairKinds + 1, StoryBeats.IssueNames.Length);
+            for (var kind = 1; kind <= Balance.RepairKinds; kind++) Assert.IsNotEmpty(StoryBeats.IssueNames[kind]);
+        }
+
+        [Test]
+        public void ThanksLine_NeverThrows_ForAnySeed()
+        {
+            foreach (var seed in new[] { 0, 1, 7, -3, int.MaxValue, int.MinValue + 1 }) Assert.IsNotEmpty(StoryBeats.ThanksLine(seed));
+        }
+
+        [Test]
+        public void Repair_IsAFewHitsAtTheStartOfEveryDistrict()
+        {
+            // One hit at hammer level 0 does `scale` work, so the repair must stay a short, friendly job.
+            foreach (var d in Balance.Districts) Assert.LessOrEqual(Balance.RepairWork(d.Scale) / d.Scale, 20, d.Name);
+        }
+    }
+}

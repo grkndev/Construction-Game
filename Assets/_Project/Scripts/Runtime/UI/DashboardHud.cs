@@ -67,7 +67,8 @@ namespace Game.UI
                 if (!game.IsUnlocked(i))
                     cards[i].Show(def.Name, $"Seviye {def.RequiredLevel}", Locked, locked: true);
                 else if (state.IsComplete)
-                    cards[i].Show(def.Name, "Tamamlandı", Done, locked: false);
+                    cards[i].Show(def.Name, state.IssueCount > 0 ? $"Tamamlandı  •  {state.IssueCount} sorun" : "Tamamlandı",
+                        state.IssueCount > 0 ? Open : Done, locked: false);
                 else
                     cards[i].Show(def.Name, $"{state.CompletedCount}/{state.PlotCount} bina  %{Mathf.FloorToInt(state.Fraction * 100f)}", Open, locked: false);
             }

@@ -35,7 +35,7 @@ namespace Game.World
             }
 
             // Pick (or re-pick after the plot is finished) the unfinished plot with the fewest helpers.
-            if (site == null || site.IsComplete)
+            if (site == null || !site.NeedsWork)
             {
                 site?.ReleaseWorker();
                 site = game != null ? game.PickSiteForWorker(transform.position) : null;

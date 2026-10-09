@@ -28,6 +28,7 @@ namespace Game.Core
         [SerializeField] Character player;
         [SerializeField] IsoCameraFollow cameraRig;
         [SerializeField] Transform overviewTarget;
+        [SerializeField] ToonPalette palette;
         [SerializeField] float overviewScale = 3.7f;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
@@ -79,14 +80,21 @@ namespace Game.Core
         /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
         public event Action ShopToggleRequested;
         public event Action<int> LeveledUp;
+        /// <summary>A longer story line (text, seconds) for the HUD: the opening and each district's first visit.</summary>
+        public event Action<string, float> Story;
 
         DistrictState[] states;
         readonly Dictionary<BuildSite, (int district, int plot)> siteLookup = new Dictionary<BuildSite, (int, int)>();
         readonly List<AutoWorker> workers = new List<AutoWorker>();
         PlayerController playerController;
+        readonly Dictionary<BuildSite, Resident> residents = new Dictionary<BuildSite, Resident>();
+        readonly System.Random random = new System.Random();
         SaveStore store;
         bool persist;
+        bool openingSeen;
+        long savedAtTicks;
         float autosave = AutosaveSeconds;
+        float scheduleTimer;
 
         void Awake()
         {
@@ -101,6 +109,13 @@ namespace Game.Core
             if (persist && LaunchArgs.Has("-reset")) store.Delete();
             ApplySave(persist ? store.Load() : null);
 
+            // Time spent away counts towards new problems (the caps keep it from piling up).
+            if (savedAtTicks > 0)
+            {
+                var away = (DateTime.UtcNow - new DateTime(savedAtTicks, DateTimeKind.Utc)).TotalSeconds;
+                if (away > 0) foreach (var state in states) RepairSchedule.Advance(state, Math.Min(away, 7 * 86400.0), random);
+            }
+
             // Every plot's building is built once up front (the dashboard shows them all) and put back as saved.
             for (var d = 0; d < districts.Length; d++)
             {
@@ -111,6 +126,8 @@ namespace Game.Core
                     sites[p].Restore(states[d].PlotWork[p]);
                     sites[p].Completed += OnSiteCompleted;
                     siteLookup[sites[p]] = (d, p);
+                    if (states[d].IsPlotComplete(p)) SpawnResident(d, p, announce: false);
+                    ApplyIssue(d, p);
                 }
             }
             CityComplete = AllDistrictsComplete();
@@ -125,12 +142,25 @@ namespace Game.Core
             hud.Bind(this);
             dashboard.Bind(this);
             ShowDashboard(snapCamera: true);
+
+            if (!openingSeen)
+            {
+                openingSeen = true;
+                Story?.Invoke(StoryBeats.Opening, 7f);
+            }
         }
 
         void Update()
         {
             Boost.Tick(Time.deltaTime);
             LevelBuff.Tick(Time.deltaTime);
+
+            scheduleTimer += Time.deltaTime;
+            if (scheduleTimer >= 5f)
+            {
+                TickRepairSchedule(scheduleTimer);
+                scheduleTimer = 0f;
+            }
 
             if (!InDistrict) return;
             autosave -= Time.deltaTime;
@@ -153,6 +183,8 @@ namespace Game.Core
             Economy.Add(save.coins);
             Level.Restore(save.xp);
             ColaCount = Mathf.Clamp(save.cola, 0, Balance.MaxColaInventory);
+            openingSeen = save.openingSeen;
+            savedAtTicks = save.savedAtUtcTicks;
             for (var d = 0; d < states.Length && d < save.districts.Length; d++) states[d].Restore(save.districts[d]);
         }
 
@@ -167,6 +199,7 @@ namespace Game.Core
                 xp = Level.Xp,
                 cola = ColaCount,
                 savedAtUtcTicks = DateTime.UtcNow.Ticks,
+                openingSeen = openingSeen,
                 districts = Array.ConvertAll(states, s => s.ToSave()),
             });
         }
@@ -219,7 +252,11 @@ namespace Game.Core
             cameraRig.SetView(player.transform, 1f, snap: true);
             ModeChanged?.Invoke();
             StateChanged?.Invoke();
-            ShowHint($"{def.Name}: inşaata yaklaş, otomatik çalışırsın");
+            if (!states[index].IntroSeen)
+            {
+                states[index].IntroSeen = true;
+                Story?.Invoke(StoryBeats.DistrictIntro[index], 6f);
+            }
             return true;
         }
 
@@ -249,7 +286,7 @@ namespace Game.Core
             var bestDistance = radius;
             foreach (var site in Sites)
             {
-                if (site.State != SiteState.Active) continue;
+                if (!site.NeedsWork) continue;
                 var d = Vector3.ProjectOnPlane(site.transform.position - position, Vector3.up).magnitude;
                 if (d > bestDistance) continue;
                 best = site;
@@ -264,7 +301,7 @@ namespace Game.Core
             BuildSite best = null;
             foreach (var site in Sites)
             {
-                if (site.State != SiteState.Active) continue;
+                if (!site.NeedsWork) continue;
                 if (best == null || site.AssignedWorkers < best.AssignedWorkers ||
                     (site.AssignedWorkers == best.AssignedWorkers &&
                      (site.transform.position - from).sqrMagnitude < (best.transform.position - from).sqrMagnitude))
@@ -279,10 +316,16 @@ namespace Game.Core
         /// </summary>
         public HitResult TryHit(BuildSite site, int power, Vector3 point, Character actor)
         {
-            if (site == null || site.State != SiteState.Active) return HitResult.NoTarget;
+            if (site == null || !site.NeedsWork) return HitResult.NoTarget;
 
             var free = Boost.IsActive;
             if (!free && !actor.Energy.CanSpend) return HitResult.Tired;
+            if (site.State == SiteState.Broken)
+            {
+                if (!free) actor.Energy.TrySpend();
+                RepairHit(site, power, point);
+                return HitResult.Hit;
+            }
 
             var applied = site.AddWork(power, point);
             if (applied == 0) return HitResult.NoTarget;
@@ -293,10 +336,36 @@ namespace Game.Core
             return HitResult.Hit;
         }
 
+        // A hit on a broken building adds repair work instead of building progress; finishing it pays a bonus.
+        void RepairHit(BuildSite site, int power, Vector3 point)
+        {
+            var (d, p) = siteLookup[site];
+            var state = states[d];
+            var needed = Balance.RepairWork(state.Def.Scale);
+            var done = state.AddRepairWork(p, power);
+            site.RepairHit(done ? 1f : Mathf.Clamp01(state.RepairWork[p] / (float)needed), point);
+            if (!done)
+            {
+                Popup("Tamir", point, coinColor, 0.8f);
+                return;
+            }
+
+            var reward = Balance.RepairReward(state.Def.Scale);
+            site.SetIssue(0);
+            ApplyIssue(d, p);
+            Economy.Add(reward);
+            Level.Add(Balance.RepairXp);
+            var top = site.transform.position + Vector3.up * 4.5f;
+            Popup($"{StoryBeats.ThanksLine(d * 7 + p)} +{NumberFormat.Compact(reward)}", top, bonusColor, 1.4f);
+            StateChanged?.Invoke();
+            SaveNow();
+        }
+
         void OnSiteCompleted(BuildSite site)
         {
             var (d, p) = siteLookup[site];
             states[d].PlotWork[p] = site.Plan.TotalWork;
+            SpawnResident(d, p, announce: true);
 
             Economy.Add(site.Plan.CompletionBonus);
             Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(site.Plan.CompletionBonus)}",
@@ -327,6 +396,55 @@ namespace Game.Core
             LeveledUp?.Invoke(level);
             for (var d = 0; d < states.Length; d++)
                 if (Balance.Districts[d].RequiredLevel == level) ShowHint($"Yeni mahalle açıldı: {Balance.Districts[d].Name}!");
+            StateChanged?.Invoke();
+        }
+
+        // ---------- residents and repairs ----------
+
+        void SpawnResident(int d, int p, bool announce)
+        {
+            var site = districts[d].Sites[p];
+            if (residents.ContainsKey(site)) return;
+
+            // Home: in front of the building, on the side facing the district centre (and the camera).
+            var toCentre = districts[d].Center - site.transform.position;
+            toCentre.y = 0f;
+            var side = Quaternion.Euler(0f, 40f, 0f) * toCentre.normalized;
+            var home = site.transform.position + side * 3.6f;
+            residents[site] = Resident.Spawn(districts[d].transform, home, palette, d * 3 + p);
+            if (announce) ShowHint(StoryBeats.MovedIn(site.Plan.Name));
+        }
+
+        // Makes the building (and its resident) match the problem recorded in the district state.
+        void ApplyIssue(int d, int p)
+        {
+            var site = districts[d].Sites[p];
+            var kind = states[d].Issues[p];
+            site.SetIssue(kind);
+            if (residents.TryGetValue(site, out var resident)) resident.SetProblem(kind != 0);
+        }
+
+        void TickRepairSchedule(float seconds)
+        {
+            var any = false;
+            for (var d = 0; d < states.Length; d++)
+            {
+                var broken = RepairSchedule.Advance(states[d], seconds, random);
+                foreach (var p in broken)
+                {
+                    any = true;
+                    ApplyIssue(d, p);
+                    if (InDistrict && CurrentIndex == d) ShowHint(StoryBeats.Problem(states[d].Def.Plans[p].Name, states[d].Issues[p]));
+                }
+            }
+            if (any) StateChanged?.Invoke();
+        }
+
+        /// <summary>Testing hook (see DevCommands): gives a finished building a problem right now.</summary>
+        public void ForceIssue(int district, int plot, int kind)
+        {
+            states[district].Break(plot, kind);
+            ApplyIssue(district, plot);
             StateChanged?.Invoke();
         }
 

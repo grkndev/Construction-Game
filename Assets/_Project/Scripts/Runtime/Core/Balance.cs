@@ -43,7 +43,7 @@ namespace Game.Core
         public const float RepairInterval = 1500f;       // seconds (25 min) between problems in a district
         public const int MaxIssuesPerDistrict = 3;
         public const int RepairKinds = 4;                // roof leak, broken pipe, bad wiring, cracked wall
-        public static int RepairWork(int scale) => 40 * scale;
+        public static int RepairWork(int scale) => 12 * scale;   // a handful of hits even at hammer level 0
         public static int RepairReward(int scale) => 60 * scale;
         public const int RepairXp = 1;
 

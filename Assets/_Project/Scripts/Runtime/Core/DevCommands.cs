@@ -8,7 +8,7 @@ namespace Game.Core
     /// Command-line hooks for automated checks of a built player (no effect unless the flags are passed):
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
-    /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N,
+    /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings, <c>-break N</c> gives two of them a problem,
     /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins first, <c>-shop</c> opens the shop panel.
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
@@ -30,6 +30,13 @@ namespace Game.Core
             yield return null;   // let GameController.Start build the dashboard first
             if (int.TryParse(LaunchArgs.Value("-xp"), out var xp)) game.Level.Add(xp);
             if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);
+            if (int.TryParse(LaunchArgs.Value("-finish"), out var finish))
+                foreach (var site in game.Districts[finish].Sites) site.AddWork(int.MaxValue / 2, site.transform.position);
+            if (int.TryParse(LaunchArgs.Value("-break"), out var broken))
+            {
+                game.ForceIssue(broken, 0, 1);
+                game.ForceIssue(broken, 1, 3);
+            }
             if (int.TryParse(LaunchArgs.Value("-enter"), out var district)) game.EnterDistrict(district);
             if (LaunchArgs.Has("-shop")) game.ToggleShop();
             if (demo) StartCoroutine(Demo());
@@ -45,7 +52,8 @@ namespace Game.Core
             foreach (var c in FindObjectsByType<Game.World.Character>(FindObjectsSortMode.None)) if (c.Energy.IsExhausted) resting++;
             var progress = new System.Text.StringBuilder();
             for (var i = 0; i < game.Districts.Count; i++)
-                progress.Append($"{Balance.Districts[i].Name}:{game.StateOf(i).CompletedCount}/{game.StateOf(i).PlotCount} ");
+                progress.Append($"{Balance.Districts[i].Name}:{game.StateOf(i).CompletedCount}/{game.StateOf(i).PlotCount}" +
+                                $"{(game.StateOf(i).IssueCount > 0 ? $"(!{game.StateOf(i).IssueCount})" : "")} ");
             Debug.Log($"[Dev] mode={game.Mode} level={game.Level.Level} xp={game.Level.Xp} characters resting={resting}; {progress}");
             Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, cityComplete={game.CityComplete}");
             Application.Quit();
@@ -85,7 +93,7 @@ namespace Game.Core
                 Game.World.BuildSite site = null;
                 foreach (var candidate in game.Sites)
                 {
-                    if (candidate.State != Game.World.SiteState.Active) continue;
+                    if (!candidate.NeedsWork) continue;
                     if (site == null || candidate.Plan.TotalWork < site.Plan.TotalWork) site = candidate;
                 }
                 if (site == null)

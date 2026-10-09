@@ -77,6 +77,7 @@ namespace Game.Editor
             EditorWire.Set(game, "dashboard", dashboard);
             EditorWire.Set(game, "cameraRig", cameraRig);
             EditorWire.Set(game, "overviewTarget", overview);
+            EditorWire.Set(game, "palette", palette);
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException($"Could not save {ScenePath}");
             Debug.Log($"[Scene] Saved {ScenePath}");
