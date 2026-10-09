@@ -45,6 +45,7 @@ namespace Game.Editor
         {
             RequireTmp();
             ProjectSettingsApplier.Apply();
+            AudioBuilder.Ensure();
             GameSceneBuilder.Ensure();
             SetupBuildSettings();
             AssetDatabase.SaveAssets();
@@ -56,6 +57,7 @@ namespace Game.Editor
         {
             RequireTmp();
             ProjectSettingsApplier.Apply();
+            AudioBuilder.Ensure();
             GameSceneBuilder.Rebuild();
             SetupBuildSettings();
             AssetDatabase.SaveAssets();

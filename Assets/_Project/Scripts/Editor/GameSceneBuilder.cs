@@ -1,4 +1,5 @@
 using System.IO;
+using Game.Audio;
 using Game.Core;
 using Game.Player;
 using Game.UI;
@@ -73,7 +74,8 @@ namespace Game.Editor
             EditorWire.Set(spawner, "game", game);
             EditorWire.Set(spawner, "player", player.transform);
             EditorWire.Set(spawner, "palette", palette);
-            BuildHud(font, outlineMat, out var hud, out var dashboard);
+            var audioManager = BuildAudio(game);
+            BuildHud(font, outlineMat, audioManager, out var hud, out var dashboard);
 
             EditorWire.SetArray(game, "districts", districts);
             EditorWire.Set(game, "workerPrefab", autoWorker);
@@ -413,7 +415,7 @@ namespace Game.Editor
         static readonly Color PanelColor = new Color(0.17f, 0.13f, 0.25f, 0.86f);
         static readonly Color InkColor = new Color(0.17f, 0.13f, 0.2f);
 
-        static void BuildHud(TMP_FontAsset font, Material outlineMat, out GameHud hud, out DashboardHud dashboard)
+        static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard)
         {
             var es = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(InputSystemUIInputModule));
             es.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
@@ -477,7 +479,21 @@ namespace Game.Editor
             var shop = BuildShop(group, rounded, font);
             BuildTouchControls(group, knob);
 
+            // Music and effects switches, top-right on every screen (GameHud shifts them left of the map button inside a district).
+            var audioGroup = Rect(root, "AudioGroup", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            var musicButton = TintedButton(audioGroup, "MusicButton", rounded, font, new Vector2(1f, 1f), new Vector2(-205f, -40f), new Vector2(150f, 90f),
+                new Color(0.85f, 0.8f, 1f), 28, out var musicLabel);
+            var sfxButton = TintedButton(audioGroup, "SfxButton", rounded, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(150f, 90f),
+                new Color(0.85f, 0.8f, 1f), 28, out var sfxLabel);
+            var audioSettings = audioGroup.gameObject.AddComponent<AudioSettingsButtons>();
+            EditorWire.Set(audioSettings, "audioManager", audioManager);
+            EditorWire.Set(audioSettings, "musicButton", musicButton);
+            EditorWire.Set(audioSettings, "musicLabel", musicLabel);
+            EditorWire.Set(audioSettings, "sfxButton", sfxButton);
+            EditorWire.Set(audioSettings, "sfxLabel", sfxLabel);
+
             hud = canvasGo.AddComponent<GameHud>();
+            EditorWire.Set(hud, "audioGroup", audioGroup);
             EditorWire.Set(hud, "districtGroup", groupRt.gameObject);
             EditorWire.Set(hud, "coinsText", coinsText);
             EditorWire.Set(hud, "coinPanel", coinPanel.GetComponent<RectTransform>());
@@ -499,6 +515,29 @@ namespace Game.Editor
             EditorWire.Set(hud, "playerEnergyBack", energyBack);
             EditorWire.Set(hud, "playerEnergyFill", playerFill);
             EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
+
+            // A tick for every plain button; purchases and the cola button have sounds of their own.
+            var silent = new System.Collections.Generic.HashSet<string> { "HammerButton", "WorkerButton", "StaminaButton", "SpeedButton", "ColaBuyButton", "ColaUseButton" };
+            var ticking = new System.Collections.Generic.List<Object>();
+            foreach (var button in canvasGo.GetComponentsInChildren<Button>(true))
+                if (!silent.Contains(button.name)) ticking.Add(button);
+            var clicks = canvasGo.AddComponent<UiClickSounds>();
+            EditorWire.Set(clicks, "audioManager", audioManager);
+            EditorWire.SetArray(clicks, "buttons", ticking.ToArray());
+        }
+
+        // One object that plays all music and effects; the clips are the synthesised WAVs from AudioBuilder.
+        static AudioManager BuildAudio(GameController game)
+        {
+            var manager = new GameObject("Audio").AddComponent<AudioManager>();
+            EditorWire.Set(manager, "game", game);
+            var kinds = (SfxKind[])System.Enum.GetValues(typeof(SfxKind));
+            var clips = new Object[kinds.Length];
+            foreach (var kind in kinds) clips[(int)kind] = AssetDatabase.LoadAssetAtPath<AudioClip>(AudioBuilder.SfxPath(kind));
+            EditorWire.SetArray(manager, "sfx", clips);
+            EditorWire.Set(manager, "musicDashboard", AssetDatabase.LoadAssetAtPath<AudioClip>(AudioBuilder.DashboardMusicPath));
+            EditorWire.Set(manager, "musicDistrict", AssetDatabase.LoadAssetAtPath<AudioClip>(AudioBuilder.DistrictMusicPath));
+            return manager;
         }
 
         // The map screen: world name with arrows on top, a hint at the bottom and one card per district (placed over the

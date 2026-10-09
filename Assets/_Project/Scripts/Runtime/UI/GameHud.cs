@@ -14,6 +14,7 @@ namespace Game.UI
         [SerializeField] TMP_Text coinsText;
         [SerializeField] RectTransform coinPanel;
         [SerializeField] RectTransform levelPanel;
+        [SerializeField] RectTransform audioGroup;   // music / effects switches: top-right, shifted left of the map button inside a district
         [SerializeField] UiPlate buildingPlate;
         [SerializeField] UiPlate hintPlate;
         [SerializeField] UiPlate victoryPlate;
@@ -68,6 +69,7 @@ namespace Game.UI
             districtGroup.SetActive(game.InDistrict);
             coinPanel.gameObject.SetActive(game.InDistrict);   // coins belong to a district: the map shows none
             levelPanel.anchoredPosition = new Vector2(levelPanel.anchoredPosition.x, game.InDistrict ? -150f : -40f);
+            audioGroup.anchoredPosition = new Vector2(game.InDistrict ? -330f : 0f, 0f);
             if (!game.InDistrict)
             {
                 shop.HideImmediate();

@@ -84,6 +84,8 @@ namespace Game.Core
         /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
         public event Action ShopToggleRequested;
         public event Action<int> LeveledUp;
+        /// <summary>Something happened that deserves a sound (played by the audio manager).</summary>
+        public event Action<SfxKind> Sfx;
         /// <summary>A longer story line (text, seconds) for the HUD: the opening and each district's first visit.</summary>
         public event Action<string, float> Story;
 
@@ -135,6 +137,7 @@ namespace Game.Core
                     sites[p].Initialize(states[d].Def.Plans[p], d * sites.Length + p, sites[p].GetComponentInChildren<TMPro.TMP_Text>(true));
                     sites[p].Restore(states[d].PlotWork[p]);
                     sites[p].Completed += OnSiteCompleted;
+                    sites[p].FloorBuilt += _ => Sfx?.Invoke(SfxKind.FloorBuilt);
                     siteLookup[sites[p]] = (d, p);
                     if (states[d].IsPlotComplete(p)) SpawnResident(d, p, announce: false);
                     ApplyIssue(d, p);
@@ -262,6 +265,7 @@ namespace Game.Core
             ModeChanged?.Invoke();
             CoinsChanged?.Invoke();
             StateChanged?.Invoke();
+            Sfx?.Invoke(SfxKind.Enter);
             if (!states[index].IntroSeen)
             {
                 states[index].IntroSeen = true;
@@ -276,6 +280,7 @@ namespace Game.Core
             SaveNow();
             foreach (var worker in workers) if (worker != null) Destroy(worker.gameObject);
             workers.Clear();
+            Sfx?.Invoke(SfxKind.Exit);
             ShowDashboard();
         }
 
@@ -342,6 +347,7 @@ namespace Game.Core
 
             if (!free) actor.Energy.TrySpend();
             Economy.Add(applied);
+            Sfx?.Invoke(actor.IsPlayer ? SfxKind.HitPlayer : SfxKind.HitWorker);
             Popup($"+{NumberFormat.Compact(applied)}", point, coinColor, 1f);
             return HitResult.Hit;
         }
@@ -356,6 +362,7 @@ namespace Game.Core
             site.RepairHit(done ? 1f : Mathf.Clamp01(state.RepairWork[p] / (float)needed), point);
             if (!done)
             {
+                Sfx?.Invoke(SfxKind.RepairHit);
                 Popup("Tamir", point, coinColor, 0.8f);
                 return;
             }
@@ -367,6 +374,7 @@ namespace Game.Core
             Level.Add(Balance.RepairXp);
             var top = site.transform.position + Vector3.up * 4.5f;
             Popup($"{StoryBeats.ThanksLine(d * 7 + p)} +{NumberFormat.Compact(reward)}", top, bonusColor, 1.4f);
+            Sfx?.Invoke(SfxKind.RepairDone);
             StateChanged?.Invoke();
             SaveNow();
         }
@@ -380,6 +388,7 @@ namespace Game.Core
             states[d].Economy.Add(site.Plan.CompletionBonus);
             Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(site.Plan.CompletionBonus)}",
                 site.transform.position + Vector3.up * 4.5f, bonusColor, 1.7f);
+            Sfx?.Invoke(SfxKind.BuildingDone);
             Level.Add(site.Plan.Xp);
             if (states[d].IsComplete) ShowHint($"{states[d].Def.Name} tamamlandı!");
 
@@ -404,6 +413,7 @@ namespace Game.Core
         void OnLeveledUp(int level)
         {
             LeveledUp?.Invoke(level);
+            Sfx?.Invoke(SfxKind.LevelUp);
             for (var d = 0; d < states.Length; d++)
                 if (Balance.Districts[d].RequiredLevel == level) ShowHint($"Yeni mahalle açıldı: {Balance.Districts[d].Name}!");
             StateChanged?.Invoke();
@@ -444,7 +454,9 @@ namespace Game.Core
                 {
                     any = true;
                     ApplyIssue(d, p);
-                    if (InDistrict && CurrentIndex == d) ShowHint(StoryBeats.Problem(states[d].Def.Plans[p].Name, states[d].Issues[p]));
+                    if (!InDistrict || CurrentIndex != d) continue;
+                    ShowHint(StoryBeats.Problem(states[d].Def.Plans[p].Name, states[d].Issues[p]));
+                    Sfx?.Invoke(SfxKind.Problem);
                 }
             }
             if (any) StateChanged?.Invoke();
@@ -464,6 +476,7 @@ namespace Game.Core
         {
             if (!InDistrict || !Hammer.TryBuy(Economy)) return;
             ShowHint($"Çekiç güçlendi! Vuruş: {HammerPower}");
+            Sfx?.Invoke(SfxKind.Buy);
             StateChanged?.Invoke();
         }
 
@@ -472,6 +485,7 @@ namespace Game.Core
             if (!InDistrict || !Workers.TryBuy(Economy)) return;
             SpawnWorker(CurrentDistrict);
             ShowHint("Yeni işçi işe başladı!");
+            Sfx?.Invoke(SfxKind.Buy);
             StateChanged?.Invoke();
         }
 
@@ -481,6 +495,7 @@ namespace Game.Core
             foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.ApplyStamina(Stamina.Level);
             var hits = Balance.HitsPerBar(Balance.PlayerEnergy, Stamina.Level);
             ShowHint($"Dayanıklılık arttı! Bir dolu enerji artık {hits} vuruş, herkes daha çabuk toparlanıyor.");
+            Sfx?.Invoke(SfxKind.Buy);
             Popup($"DAYANIKLILIK Sv.{Stamina.Level}!", player.transform.position + Vector3.up * 3.6f, new Color(0.5f, 1f, 0.6f), 1.5f);
             StateChanged?.Invoke();
         }
@@ -491,6 +506,7 @@ namespace Game.Core
             foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);
             var percent = Mathf.RoundToInt((Balance.SpeedMultiplier(Speed.Level) - 1f) * 100f);
             ShowHint($"Hız arttı! Herkes %{percent} daha hızlı yürüyor, vuruyor ve toparlanıyor.");
+            Sfx?.Invoke(SfxKind.Buy);
             Popup($"HIZ Sv.{Speed.Level}!", player.transform.position + Vector3.up * 3.6f, new Color(0.55f, 0.85f, 1f), 1.5f);
             StateChanged?.Invoke();
         }
@@ -507,6 +523,7 @@ namespace Game.Core
             }
             ColaCount++;
             ShowHint($"Sarı Kola alındı! ({ColaCount}/{Balance.MaxColaInventory})");
+            Sfx?.Invoke(SfxKind.ColaPickup);
             StateChanged?.Invoke();
             return true;
         }
@@ -518,6 +535,7 @@ namespace Game.Core
             ColaCount--;
             RefillEnergy();
             LevelBuff.Activate(Balance.ColaLevelSeconds);
+            Sfx?.Invoke(SfxKind.ColaDrink);
             ShowHint($"Sarı Kola! Herkesin enerjisi doldu, {Balance.ColaLevelSeconds:0} sn boyunca seviye +{Balance.LevelBonus}.");
             StateChanged?.Invoke();
         }
@@ -529,6 +547,8 @@ namespace Game.Core
             RefillEnergy();
             LevelBuff.Activate(Balance.BoostSeconds);
             Boost.Activate(Balance.BoostSeconds);
+            Sfx?.Invoke(SfxKind.Buy);
+            Sfx?.Invoke(SfxKind.Boost);
             ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye: seviye +{Balance.LevelBonus}, herkes hızlı ve yorulmuyor!");
             if (FocusSite != null) Popup("COŞKU!", FocusSite.transform.position + Vector3.up * 5f, colaColor, 1.8f);
             StateChanged?.Invoke();

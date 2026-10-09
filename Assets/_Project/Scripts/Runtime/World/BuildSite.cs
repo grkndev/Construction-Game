@@ -52,6 +52,8 @@ namespace Game.World
         public int Issue { get; private set; }
 
         public event Action<BuildSite> Completed;
+        /// <summary>A floor just appeared (not raised when a saved building is restored).</summary>
+        public event Action<BuildSite> FloorBuilt;
 
         /// <summary>How many auto-workers currently work here; the dispatcher sends new ones to the emptiest plot.</summary>
         public int AssignedWorkers { get; private set; }
@@ -276,6 +278,7 @@ namespace Game.World
             var floor = floors[floorNumber - 1];
             floor.gameObject.SetActive(true);
             StartCoroutine(PopIn(floor, 0.5f));
+            FloorBuilt?.Invoke(this);
         }
 
         void OnCompleted()
