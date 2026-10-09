@@ -13,6 +13,8 @@ namespace Game.Core
         public UpgradeTrack Workers { get; }
         public UpgradeTrack Stamina { get; }
         public UpgradeTrack Speed { get; }
+        /// <summary>Coins earned in this district stay in this district (nothing is shared between districts).</summary>
+        public Economy Economy { get; } = new Economy();
 
         public int[] PlotWork { get; }
         /// <summary>Per plot: 0 = fine, otherwise the kind of problem (1..<see cref="Balance.RepairKinds"/>).</summary>
@@ -98,6 +100,7 @@ namespace Game.Core
             workers = Workers.Level,
             stamina = Stamina.Level,
             speed = Speed.Level,
+            coins = Economy.Coins,
             plotWork = (int[])PlotWork.Clone(),
             issues = (int[])Issues.Clone(),
             repairWork = (int[])RepairWork.Clone(),
@@ -113,6 +116,7 @@ namespace Game.Core
             Workers.SetLevel(save.workers);
             Stamina.SetLevel(save.stamina);
             Speed.SetLevel(save.speed);
+            Economy.Add(save.coins);
             for (var i = 0; i < PlotCount; i++)
             {
                 PlotWork[i] = Math.Max(0, Math.Min(Def.Plans[i].TotalWork, Get(save.plotWork, i)));

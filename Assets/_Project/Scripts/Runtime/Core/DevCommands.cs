@@ -9,7 +9,7 @@ namespace Game.Core
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings, <c>-break N</c> gives two of them a problem,
-    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins first, <c>-shop</c> opens the shop panel.
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel.
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
@@ -29,7 +29,6 @@ namespace Game.Core
 
             yield return null;   // let GameController.Start build the dashboard first
             if (int.TryParse(LaunchArgs.Value("-xp"), out var xp)) game.Level.Add(xp);
-            if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);
             if (int.TryParse(LaunchArgs.Value("-finish"), out var finish))
                 foreach (var site in game.Districts[finish].Sites) site.AddWork(int.MaxValue / 2, site.transform.position);
             if (int.TryParse(LaunchArgs.Value("-break"), out var broken))
@@ -38,6 +37,7 @@ namespace Game.Core
                 game.ForceIssue(broken, 1, 3);
             }
             if (int.TryParse(LaunchArgs.Value("-enter"), out var district)) game.EnterDistrict(district);
+            if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);   // goes to the district just entered
             if (LaunchArgs.Has("-shop")) game.ToggleShop();
             if (demo) StartCoroutine(Demo());
 

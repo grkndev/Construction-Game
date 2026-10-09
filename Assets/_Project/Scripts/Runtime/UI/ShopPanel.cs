@@ -36,7 +36,7 @@ namespace Game.UI
         public void Bind(GameController controller)
         {
             game = controller;
-            game.Economy.Changed += Refresh;
+            game.CoinsChanged += Refresh;
             game.StateChanged += Refresh;
             game.ShopToggleRequested += Toggle;
 
@@ -56,7 +56,7 @@ namespace Game.UI
         void OnDestroy()
         {
             if (game == null) return;
-            game.Economy.Changed -= Refresh;
+            game.CoinsChanged -= Refresh;
             game.StateChanged -= Refresh;
             game.ShopToggleRequested -= Toggle;
         }
@@ -90,34 +90,42 @@ namespace Game.UI
             panel.gameObject.SetActive(slide > 0.001f);
         }
 
+        // Every card shows "tier/last tier" (all start at 1) so it is clear how many purchases are left.
         void Refresh()
         {
             if (!game.InDistrict) return;   // upgrades belong to a district; nothing to show on the dashboard
-            hammerLabel.text = game.Hammer.IsMaxed
-                ? "ÇEKİÇ\nEn yüksek seviye"
-                : $"ÇEKİÇ  Sv.{game.Hammer.Level + 1}\nVuruş {game.BaseHammerPower} (+1)  •  {NumberFormat.Compact(game.Hammer.NextCost)}";
-            hammerButton.interactable = !game.Hammer.IsMaxed && game.Economy.CanAfford(game.Hammer.NextCost);
+            var coins = game.Economy;
 
-            workerLabel.text = game.Workers.IsMaxed
-                ? $"İŞÇİ  {game.Workers.Level}\nEkip tamam"
-                : $"İŞÇİ AL  ({game.Workers.Level}/{Balance.MaxWorkers})\n{NumberFormat.Compact(game.Workers.NextCost)}";
-            workerButton.interactable = !game.Workers.IsMaxed && game.Economy.CanAfford(game.Workers.NextCost);
+            var hammer = game.Hammer;
+            hammerLabel.text = hammer.IsMaxed
+                ? $"ÇEKİÇ  {hammer.Tier}/{hammer.MaxTier}\nEn yüksek • vuruş {game.BaseHammerPower}"
+                : $"ÇEKİÇ  {hammer.Tier}/{hammer.MaxTier}\nVuruş {game.BaseHammerPower} → {game.BaseHammerPower + game.CurrentState.Def.Scale}  •  {NumberFormat.Compact(hammer.NextCost)}";
+            hammerButton.interactable = !hammer.IsMaxed && coins.CanAfford(hammer.NextCost);
+
+            var workers = game.Workers;
+            workerLabel.text = workers.IsMaxed
+                ? $"İŞÇİ  {workers.Tier}/{workers.MaxTier}\nEkip tamam"
+                : $"İŞÇİ  {workers.Tier}/{workers.MaxTier}\nYeni işçi al  •  {NumberFormat.Compact(workers.NextCost)}";
+            workerButton.interactable = !workers.IsMaxed && coins.CanAfford(workers.NextCost);
 
             // Shows what the upgrade does in the unit the player feels: hits per full energy bar.
-            var now = Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level);
-            staminaLabel.text = game.Stamina.IsMaxed
-                ? $"DAYANIKLILIK\nEn yüksek • {now} vuruş"
-                : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\n{now} → {Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level + 1)} vuruş  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
-            staminaButton.interactable = !game.Stamina.IsMaxed && game.Economy.CanAfford(game.Stamina.NextCost);
+            var stamina = game.Stamina;
+            var now = Balance.HitsPerBar(Balance.PlayerEnergy, stamina.Level);
+            staminaLabel.text = stamina.IsMaxed
+                ? $"DAYANIKLILIK  {stamina.Tier}/{stamina.MaxTier}\nEn yüksek • {now} vuruş"
+                : $"DAYANIKLILIK  {stamina.Tier}/{stamina.MaxTier}\n{now} → {Balance.HitsPerBar(Balance.PlayerEnergy, stamina.Level + 1)} vuruş  •  {NumberFormat.Compact(stamina.NextCost)}";
+            staminaButton.interactable = !stamina.IsMaxed && coins.CanAfford(stamina.NextCost);
 
-            var speedPercent = Mathf.RoundToInt((Balance.SpeedMultiplier(game.Speed.Level + 1) - 1f) * 100f);
-            speedLabel.text = game.Speed.IsMaxed
-                ? $"HIZ\nEn yüksek • +%{Mathf.RoundToInt((Balance.SpeedMultiplier(game.Speed.Level) - 1f) * 100f)}"
-                : $"HIZ  Sv.{game.Speed.Level + 1}/{Balance.MaxSpeedLevel}\nYürü, vur, toparlan +%{speedPercent}  •  {NumberFormat.Compact(game.Speed.NextCost)}";
-            speedButton.interactable = !game.Speed.IsMaxed && game.Economy.CanAfford(game.Speed.NextCost);
+            var speed = game.Speed;
+            var speedNow = Mathf.RoundToInt((Balance.SpeedMultiplier(speed.Level) - 1f) * 100f);
+            var speedNext = Mathf.RoundToInt((Balance.SpeedMultiplier(speed.Level + 1) - 1f) * 100f);
+            speedLabel.text = speed.IsMaxed
+                ? $"HIZ  {speed.Tier}/{speed.MaxTier}\nEn yüksek • +%{speedNow}"
+                : $"HIZ  {speed.Tier}/{speed.MaxTier}\n+%{speedNow} → +%{speedNext}  •  {NumberFormat.Compact(speed.NextCost)}";
+            speedButton.interactable = !speed.IsMaxed && coins.CanAfford(speed.NextCost);
 
-            colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
-            colaBuyButton.interactable = game.Economy.CanAfford(game.ColaPrice);
+            colaBuyLabel.text = $"SARI KOLA  cepte {game.ColaCount}/{Balance.MaxColaInventory}\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
+            colaBuyButton.interactable = coins.CanAfford(game.ColaPrice);
         }
     }
 }

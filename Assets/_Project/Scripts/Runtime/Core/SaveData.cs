@@ -11,7 +11,7 @@ namespace Game.Core
 
         public int version = CurrentVersion;
         public string mapId = DefaultMapId;
-        public long coins;
+        public long coins;   // legacy (before coins became per-district): read by nobody, kept so old saves still parse
         public int xp;
         public int cola;
         public long savedAtUtcTicks;
@@ -26,6 +26,7 @@ namespace Game.Core
         public int workers;
         public int stamina;
         public int speed;
+        public long coins;
         public int[] plotWork = new int[0];
         public int[] issues = new int[0];        // per plot: 0 = fine, 1..N = kind of problem
         public int[] repairWork = new int[0];    // per plot: repair progress

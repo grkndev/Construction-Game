@@ -32,7 +32,6 @@ namespace Game.UI
             game = controller;
             game.ModeChanged += Refresh;
             game.StateChanged += Refresh;
-            game.Economy.Changed += Refresh;
 
             for (var i = 0; i < cards.Length; i++)
             {
@@ -51,7 +50,6 @@ namespace Game.UI
             if (game == null) return;
             game.ModeChanged -= Refresh;
             game.StateChanged -= Refresh;
-            game.Economy.Changed -= Refresh;
         }
 
         void Refresh()

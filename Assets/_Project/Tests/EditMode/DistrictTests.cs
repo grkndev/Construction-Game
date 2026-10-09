@@ -122,7 +122,7 @@ namespace Game.Tests
             Assert.AreEqual(s.Def.Plans[0].TotalWork, s.PlotWork[0]);   // clamped
             Assert.AreEqual(Balance.RepairKinds, s.Issues[0]);          // clamped
             Assert.AreEqual(0, s.PlotWork[2]);                          // missing -> 0
-            Assert.AreEqual(25, s.Hammer.Level);                        // clamped to max
+            Assert.AreEqual(Balance.MaxHammerLevel - 1, s.Hammer.Level); // clamped to the last tier
         }
 
         [Test]
@@ -402,7 +402,36 @@ namespace Game.Tests
                 Assert.Greater(Balance.SpeedMultiplier(level), Balance.SpeedMultiplier(level - 1));
             track.SetLevel(99);
             Assert.IsTrue(track.IsMaxed);
-            Assert.AreEqual(5, track.Level);
+            Assert.AreEqual(5, track.Tier);       // the shop shows 5/5 and nothing more can be bought
+            Assert.AreEqual(5, track.MaxTier);
+        }
+
+        [Test]
+        public void EveryUpgrade_StartsAtTierOne_AndNeverShowsMoreThanItsMaximum()
+        {
+            var s = new DistrictState(Balance.Districts[0]);
+            foreach (var track in new[] { s.Hammer, s.Workers, s.Stamina, s.Speed })
+            {
+                Assert.AreEqual(1, track.Tier);
+                var bank = new Economy();
+                bank.Add(long.MaxValue / 4);
+                while (track.TryBuy(bank)) { }
+                Assert.AreEqual(track.MaxTier, track.Tier);
+                Assert.IsTrue(track.IsMaxed);
+            }
+        }
+
+        [Test]
+        public void Coins_AreKeptPerDistrict()
+        {
+            var a = new DistrictState(Balance.Districts[0]);
+            var b = new DistrictState(Balance.Districts[1]);
+            a.Economy.Add(100);
+            Assert.AreEqual(0, b.Economy.Coins);
+
+            var copy = new DistrictState(Balance.Districts[0]);
+            copy.Restore(a.ToSave());
+            Assert.AreEqual(100, copy.Economy.Coins);
         }
 
         [Test]

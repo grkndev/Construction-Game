@@ -8,7 +8,7 @@ namespace Game.World
     /// </summary>
     public sealed class WorkerVisual : MonoBehaviour
     {
-        const float SwingDuration = 0.24f;
+        const float DefaultSwingDuration = 0.24f;
 
         [SerializeField] Transform body;
         [SerializeField] Transform hammerPivot;
@@ -19,6 +19,7 @@ namespace Game.World
         bool isTired;
         bool isBuffed;
         float swingTime = -1f;
+        float swingDuration = DefaultSwingDuration;
         Vector3 bodyBasePos;
 
         void Awake() => bodyBasePos = body.localPosition;
@@ -26,7 +27,12 @@ namespace Game.World
         /// <summary>0 = standing, 1 = full speed.</summary>
         public void SetMove(float amount01) => move = Mathf.Lerp(move, amount01, 12f * Time.deltaTime);
 
-        public void Swing() => swingTime = 0f;
+        /// <summary>Starts a hammer swing that lasts <paramref name="seconds"/> (the caller matches it to the hit pace).</summary>
+        public void Swing(float seconds = DefaultSwingDuration)
+        {
+            swingDuration = Mathf.Max(0.08f, seconds);
+            swingTime = 0f;
+        }
 
         /// <summary>Slumps forward and pants while the player's energy is exhausted.</summary>
         public void SetTired(bool value) => isTired = value;
@@ -56,7 +62,7 @@ namespace Game.World
             if (swingTime >= 0f)
             {
                 swingTime += Time.deltaTime;
-                var t = swingTime / SwingDuration;
+                var t = swingTime / swingDuration;
                 if (t >= 1f) swingTime = -1f;
                 else angle = t < 0.35f
                     ? Mathf.Lerp(-35f, -110f, Core.Easing.OutCubic(t / 0.35f))

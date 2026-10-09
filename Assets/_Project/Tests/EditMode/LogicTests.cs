@@ -317,8 +317,10 @@ namespace Game.Tests
             var t = Balance.NewStaminaTrack();
             var e = new Economy();
             e.Add(1_000_000);
-            for (var i = 0; i < Balance.MaxStaminaLevel; i++) Assert.IsTrue(t.TryBuy(e));
+            for (var i = 0; i < Balance.MaxStaminaLevel - 1; i++) Assert.IsTrue(t.TryBuy(e));   // tier 1 is free, so MaxStaminaLevel - 1 purchases
             Assert.IsFalse(t.TryBuy(e));
+            Assert.AreEqual(Balance.MaxStaminaLevel, t.Tier);
+            Assert.AreEqual(t.Tier, t.MaxTier);
         }
 
         [Test]

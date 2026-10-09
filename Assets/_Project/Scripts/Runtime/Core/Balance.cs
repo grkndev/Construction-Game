@@ -5,15 +5,20 @@ namespace Game.Core
     /// <summary>All tuning numbers in one place so the game can be balanced without hunting through code.</summary>
     public static class Balance
     {
-        public const float HitCooldown = 0.18f;          // seconds between the player's automatic hammer hits
-        public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
+        public const float HitCooldown = 0.35f;          // seconds between the player's automatic hammer hits
+        public const float WorkerHitInterval = 0.8f;     // seconds between an auto-worker's hits
+        public const float PlayerSwingSeconds = 0.32f;   // length of the player's hammer swing animation (a bit under the cooldown, so each hit reads)
+        public const float WorkerSwingSeconds = 0.30f;
+        // Upgrade caps below are "tiers" as the shop shows them: everything starts at tier 1 (workers: one free helper), the cap is
+        // reached after (cap - 1) purchases. The tracks are built with maxLevel = cap - 1.
         public const int MaxWorkers = 8;
+        public const int MaxHammerLevel = 25;
 
         // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
         // district for prices, hit power, work and rewards) with its own upgrades, and later districts also have bigger buildings
         // (the numbers below are first-district shapes times a per-district size: x1, 2.6, 5.2, 9, 13), so they take longer.
-        // Tuned with tools/balance_sim.py (attentive player, all upgrades incl. Hız): about 2.3 / 3.1 / 4.5 / 6.8 / 7.7 minutes per
-        // district, 24 in all (34 without the speed upgrade); real play is ~25% slower and has walking on top.
+        // Tuned with tools/balance_sim.py (attentive player, all upgrades, own coins in every district, one free helper to start):
+        // about 2.6 / 4.3 / 6.4 / 9 / 11.7 minutes per district, 34 in all; real play is ~25% slower and has walking on top.
         public static readonly DistrictDef[] Districts =
         {
             new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
@@ -62,7 +67,7 @@ namespace Game.Core
         const float StaminaMaxPerLevel = 0.20f;
         const float StaminaRegenPerLevel = 0.15f;
 
-        public static UpgradeTrack NewStaminaTrack(int scale = 1) => new UpgradeTrack(baseCost: 60L * scale, growth: 1.6, maxLevel: MaxStaminaLevel);
+        public static UpgradeTrack NewStaminaTrack(int scale = 1) => new UpgradeTrack(baseCost: 60L * scale, growth: 1.6, maxLevel: MaxStaminaLevel - 1);
 
         /// <summary>How many hits one full bar pays for at a stamina level; the unit the player actually feels.</summary>
         public static int HitsPerBar(EnergySettings s, int level) => (int)(WithStamina(s, level).Max / s.Cost);
@@ -92,13 +97,13 @@ namespace Game.Core
         public const int MaxSpeedLevel = 5;
         public const float SpeedPerLevel = 0.15f;
 
-        public static UpgradeTrack NewSpeedTrack(int scale = 1) => new UpgradeTrack(baseCost: 100L * scale, growth: 2.0, maxLevel: MaxSpeedLevel);
+        public static UpgradeTrack NewSpeedTrack(int scale = 1) => new UpgradeTrack(baseCost: 100L * scale, growth: 2.0, maxLevel: MaxSpeedLevel - 1);
 
         /// <summary>Pace multiplier for a speed level: 1.0 at level 0, +15% per level (1.75 at the maximum).</summary>
         public static float SpeedMultiplier(int level) => 1f + SpeedPerLevel * level;
 
-        public static UpgradeTrack NewHammerTrack(int scale = 1) => new UpgradeTrack(baseCost: 20L * scale, growth: 1.5, maxLevel: 25);
-        public static UpgradeTrack NewWorkerTrack(int scale = 1) => new UpgradeTrack(baseCost: 90L * scale, growth: 1.75, maxLevel: MaxWorkers);
+        public static UpgradeTrack NewHammerTrack(int scale = 1) => new UpgradeTrack(baseCost: 20L * scale, growth: 1.5, maxLevel: MaxHammerLevel - 1);
+        public static UpgradeTrack NewWorkerTrack(int scale = 1) => new UpgradeTrack(baseCost: 90L * scale, growth: 1.75, maxLevel: MaxWorkers - 1);
 
         /// <summary>Work (= coins) per hammer hit.</summary>
         public static int HammerPower(int hammerLevel) => 1 + hammerLevel;

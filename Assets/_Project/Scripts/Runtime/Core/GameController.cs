@@ -35,7 +35,8 @@ namespace Game.Core
         [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);
 
         // ---- shared across the whole game
-        public Economy Economy { get; } = new Economy();
+        /// <summary>The current district's coins (an empty purse on the dashboard): every district has its own money.</summary>
+        public Economy Economy => CurrentState != null ? CurrentState.Economy : noEconomy;
         public LevelTrack Level { get; } = new LevelTrack(Balance.LevelThresholds);
         public int ColaCount { get; private set; }
         /// <summary>Coşku: speed-up and free energy for everyone (bought cola only).</summary>
@@ -77,6 +78,8 @@ namespace Game.Core
         /// <summary>Raised when something the HUD shows changes outside the economy: cola count, boost, plot finished, upgrades.</summary>
         public event Action StateChanged;
         public event Action ModeChanged;
+        /// <summary>The coins of the district being visited changed (or the purse in use changed).</summary>
+        public event Action CoinsChanged;
         public event Action<string> Hint;
         /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
         public event Action ShopToggleRequested;
@@ -85,6 +88,7 @@ namespace Game.Core
         public event Action<string, float> Story;
 
         DistrictState[] states;
+        readonly Economy noEconomy = new Economy();
         readonly Dictionary<BuildSite, (int district, int plot)> siteLookup = new Dictionary<BuildSite, (int, int)>();
         readonly List<AutoWorker> workers = new List<AutoWorker>();
         PlayerController playerController;
@@ -102,7 +106,12 @@ namespace Game.Core
             playerController = player.GetComponent<PlayerController>();
 
             states = new DistrictState[districts.Length];
-            for (var d = 0; d < districts.Length; d++) states[d] = new DistrictState(Balance.Districts[d]);
+            for (var d = 0; d < districts.Length; d++)
+            {
+                states[d] = new DistrictState(Balance.Districts[d]);
+                var index = d;
+                states[d].Economy.Changed += () => { if (CurrentIndex == index) CoinsChanged?.Invoke(); };
+            }
 
             // A demo or screenshot run must neither read nor overwrite the player's real save (unless -persist asks for it, to test saving).
             persist = LaunchArgs.Has("-persist") || (!LaunchArgs.Has("-demo") && LaunchArgs.Value("-shot") == null);
@@ -181,7 +190,6 @@ namespace Game.Core
         void ApplySave(SaveData save)
         {
             if (save == null) return;
-            Economy.Add(save.coins);
             Level.Restore(save.xp);
             ColaCount = Mathf.Clamp(save.cola, 0, Balance.MaxColaInventory);
             openingSeen = save.openingSeen;
@@ -196,7 +204,6 @@ namespace Game.Core
             SyncCurrentToState();
             store.Save(new SaveData
             {
-                coins = Economy.Coins,
                 xp = Level.Xp,
                 cola = ColaCount,
                 savedAtUtcTicks = DateTime.UtcNow.Ticks,
@@ -224,6 +231,7 @@ namespace Game.Core
             player.gameObject.SetActive(false);
             cameraRig.SetView(overviewTarget, overviewScale, snapCamera);
             ModeChanged?.Invoke();
+            CoinsChanged?.Invoke();
             StateChanged?.Invoke();
         }
 
@@ -246,12 +254,13 @@ namespace Game.Core
             player.transform.SetPositionAndRotation(district.PlayerSpawn, Quaternion.Euler(0f, 135f, 0f));
             playerController.SetBounds(district.Center, district.WalkRadius);
             player.gameObject.SetActive(true);
-            for (var n = 0; n < states[index].Workers.Level; n++) SpawnWorker(district);
+            for (var n = 0; n < states[index].Workers.Tier; n++) SpawnWorker(district);   // tier 1 = the free first helper
             ApplyEffectsTo(player);
             player.Refill();
 
             cameraRig.SetView(player.transform, 1f, snap: true);
             ModeChanged?.Invoke();
+            CoinsChanged?.Invoke();
             StateChanged?.Invoke();
             if (!states[index].IntroSeen)
             {
@@ -354,7 +363,7 @@ namespace Game.Core
             var reward = Balance.RepairReward(state.Def.Scale);
             site.SetIssue(0);
             ApplyIssue(d, p);
-            Economy.Add(reward);
+            state.Economy.Add(reward);
             Level.Add(Balance.RepairXp);
             var top = site.transform.position + Vector3.up * 4.5f;
             Popup($"{StoryBeats.ThanksLine(d * 7 + p)} +{NumberFormat.Compact(reward)}", top, bonusColor, 1.4f);
@@ -368,7 +377,7 @@ namespace Game.Core
             states[d].PlotWork[p] = site.Plan.TotalWork;
             SpawnResident(d, p, announce: true);
 
-            Economy.Add(site.Plan.CompletionBonus);
+            states[d].Economy.Add(site.Plan.CompletionBonus);
             Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(site.Plan.CompletionBonus)}",
                 site.transform.position + Vector3.up * 4.5f, bonusColor, 1.7f);
             Level.Add(site.Plan.Xp);

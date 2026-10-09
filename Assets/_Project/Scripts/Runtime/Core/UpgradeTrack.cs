@@ -14,6 +14,9 @@ namespace Game.Core
 
         public int Level { get; private set; }
         public bool IsMaxed => Level >= maxLevel;
+        /// <summary>What the player sees: everyone starts at tier 1, and the last tier (MaxTier) is reached after MaxTier - 1 purchases.</summary>
+        public int Tier => Level + 1;
+        public int MaxTier => maxLevel + 1;
         public long NextCost => (long)Math.Round(baseCost * Math.Pow(growth, Level));
         public event Action Changed;
 

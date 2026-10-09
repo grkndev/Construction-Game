@@ -12,6 +12,8 @@ namespace Game.UI
         const float EnergyBarMaxWidth = 344f;   // ...up to this width at the maximum stamina level
 
         [SerializeField] TMP_Text coinsText;
+        [SerializeField] RectTransform coinPanel;
+        [SerializeField] RectTransform levelPanel;
         [SerializeField] UiPlate buildingPlate;
         [SerializeField] UiPlate hintPlate;
         [SerializeField] UiPlate victoryPlate;
@@ -42,7 +44,7 @@ namespace Game.UI
         public void Bind(GameController controller)
         {
             game = controller;
-            game.Economy.Changed += Refresh;
+            game.CoinsChanged += Refresh;
             game.StateChanged += Refresh;
             game.ModeChanged += OnModeChanged;
             game.LeveledUp += OnLeveledUp;
@@ -64,6 +66,8 @@ namespace Game.UI
         void OnModeChanged()
         {
             districtGroup.SetActive(game.InDistrict);
+            coinPanel.gameObject.SetActive(game.InDistrict);   // coins belong to a district: the map shows none
+            levelPanel.anchoredPosition = new Vector2(levelPanel.anchoredPosition.x, game.InDistrict ? -150f : -40f);
             if (!game.InDistrict)
             {
                 shop.HideImmediate();
@@ -83,7 +87,7 @@ namespace Game.UI
         void OnDestroy()
         {
             if (game == null) return;
-            game.Economy.Changed -= Refresh;
+            game.CoinsChanged -= Refresh;
             game.StateChanged -= Refresh;
             game.ModeChanged -= OnModeChanged;
             game.LeveledUp -= OnLeveledUp;
@@ -126,7 +130,7 @@ namespace Game.UI
             SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
             playerEnergyLabel.text = $"ENERJİ  {Mathf.CeilToInt(energy.Value)} / {Mathf.RoundToInt(energy.Max)}";
             var capacity = Mathf.InverseLerp(Balance.PlayerEnergy.Max,
-                Balance.WithStamina(Balance.PlayerEnergy, Balance.MaxStaminaLevel).Max, energy.Max);
+                Balance.WithStamina(Balance.PlayerEnergy, Balance.MaxStaminaLevel - 1).Max, energy.Max);
             playerEnergyBack.sizeDelta = new Vector2(Mathf.Lerp(EnergyBarMinWidth, EnergyBarMaxWidth, capacity), playerEnergyBack.sizeDelta.y);
 
             if (game.Boost.IsActive) boostPlate.Text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";

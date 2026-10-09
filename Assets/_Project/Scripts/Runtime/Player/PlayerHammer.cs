@@ -46,7 +46,7 @@ namespace Game.Player
                     toSite.y = 0f;
                     if (input.Move.sqrMagnitude < 0.01f && toSite.sqrMagnitude > 0.01f)
                         transform.rotation = Quaternion.LookRotation(toSite.normalized);
-                    visual.Swing();
+                    visual.Swing(Balance.PlayerSwingSeconds / character.SpeedMultiplier);
                     break;
                 case HitResult.Tired:
                     Hint("Yoruldun! Biraz dinlen (ya da Sarı Kola iç)");

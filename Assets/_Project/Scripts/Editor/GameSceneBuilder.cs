@@ -480,6 +480,8 @@ namespace Game.Editor
             hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "districtGroup", groupRt.gameObject);
             EditorWire.Set(hud, "coinsText", coinsText);
+            EditorWire.Set(hud, "coinPanel", coinPanel.GetComponent<RectTransform>());
+            EditorWire.Set(hud, "levelPanel", levelPanel.GetComponent<RectTransform>());
             EditorWire.Set(hud, "buildingPlate", buildingPlate);
             EditorWire.Set(hud, "hintPlate", hintPlate);
             EditorWire.Set(hud, "victoryPlate", victoryPlate);

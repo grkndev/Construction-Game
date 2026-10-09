@@ -52,10 +52,10 @@ def duty_table(P, W):
     return out
 
 
-def sim(plans, hammer, worker, stamina, P, W, speed=None, hit_rate=5.5, interval=1.1, cola_every=45.0, tmax=3600, seed=1, scale=1, coins0=0.0):
+def sim(plans, hammer, worker, stamina, P, W, speed=None, hit_rate=5.5, interval=0.8, cola_every=45.0, tmax=3600, seed=1, scale=1, coins0=0.0):
     random.seed(seed)
     remaining = [f * w for f, w, b in plans]; bonus = [b for f, w, b in plans]
-    pm = Meter(*P); workers = []          # each: [meter, hit timer]
+    pm = Meter(*P); workers = [[Meter(*W), 0.0]]   # each: [meter, hit timer]; every district starts with one free helper
     SP = 0; pace = 1.0; coins = coins0; L = 0; S = 0; t = 0.0; dt = 0.05; done = {}; buys = 0; cd = 0.0; next_cola = cola_every; buff_until = 0.0
     cost_h = lambda L: hammer[0] * hammer[1] ** L
     cost_w = lambda n: worker[0] * worker[1] ** n
@@ -95,10 +95,10 @@ def sim(plans, hammer, worker, stamina, P, W, speed=None, hit_rate=5.5, interval
 
         opts = []
         base_now = nominal(L, len(workers), S, SP)
-        if L < 25: opts.append(((nominal(L + 1, len(workers), S, SP) - base_now) / cost_h(L), 'H', cost_h(L)))
+        if L < 24: opts.append(((nominal(L + 1, len(workers), S, SP) - base_now) / cost_h(L), 'H', cost_h(L)))
         if len(workers) < 8: opts.append(((nominal(L, len(workers) + 1, S, SP) - base_now) / cost_w(len(workers)), 'W', cost_w(len(workers))))
-        if S < 10: opts.append(((nominal(L, len(workers), S + 1, SP) - base_now) / cost_s(S), 'S', cost_s(S)))
-        if speed is not None and SP < 5: opts.append(((nominal(L, len(workers), S, SP + 1) - base_now) / cost_p(SP), 'P', cost_p(SP)))
+        if S < 9: opts.append(((nominal(L, len(workers), S + 1, SP) - base_now) / cost_s(S), 'S', cost_s(S)))
+        if speed is not None and SP < 4: opts.append(((nominal(L, len(workers), S, SP + 1) - base_now) / cost_p(SP), 'P', cost_p(SP)))
         if opts:
             opts.sort(reverse=True); _, kind, c = opts[0]
             if coins >= c:
@@ -123,7 +123,7 @@ WORKER = (100, 8, 12, 1.0, 0, 0.4)
 SHAPE = [(3, 90, 120), (4, 300, 420), (6, 800, 1300)]
 # (name, scale, size): `size` multiplies the buildings' work/bonus on top of the scale so later districts take longer.
 DISTRICTS = [("Sahil", 1, 1.0), ("Merkez", 4, 2.6), ("Liman", 16, 5.2), ("Tepe", 64, 9.0), ("Sanayi", 256, 13.0)]
-HIT_RATE = 1 / 0.18   # PlayerHammer attacks as soon as the cooldown allows (Balance.HitCooldown); energy is the real limit
+HIT_RATE = 1 / 0.35   # PlayerHammer attacks as soon as the cooldown allows (Balance.HitCooldown); energy is the real limit
 
 
 def run_city(seeds=(1, 2, 3)):
@@ -131,13 +131,12 @@ def run_city(seeds=(1, 2, 3)):
     totals = [0.0] * len(DISTRICTS)
     details = []
     for sd in seeds:
-        coins = 0.0
         for i, (name, scale, size) in enumerate(DISTRICTS):
+            coins = 0.0   # coins are per district
             plans = [(f, round(w * size) * scale, round(b * size) * scale) for f, w, b in SHAPE]
             r = sim(plans, (20 * scale, 1.5, 25), (90 * scale, 1.75, 8), (60 * scale, 1.6, 10), PLAYER, WORKER, speed=(100 * scale, 2.0),
                     hit_rate=HIT_RATE, seed=sd, scale=scale, coins0=coins)
             totals[i] += r[0]
-            coins = r[6]
             if sd == seeds[0]:
                 details.append((name, r[1], r[2], r[5], r[7], [round(v / 60, 1) for _, v in sorted(r[3].items())]))
     return [t / len(seeds) for t in totals], details

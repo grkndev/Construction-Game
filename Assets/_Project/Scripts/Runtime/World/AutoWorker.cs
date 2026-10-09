@@ -73,7 +73,7 @@ namespace Game.World
             if (result == HitResult.Hit)
             {
                 timer = 0f;
-                visual.Swing();
+                visual.Swing(Balance.WorkerSwingSeconds / character.SpeedMultiplier);
             }
             else
             {
