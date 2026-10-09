@@ -11,10 +11,12 @@ namespace Game.Player
     {
         InputAction move;
         InputAction build;
+        InputAction use;
 
         public Vector2 Move => move.ReadValue<Vector2>();
         public bool BuildHeld => build.IsPressed();
         public bool BuildPressedThisFrame => build.WasPressedThisFrame();
+        public bool UsePressedThisFrame => use.WasPressedThisFrame();
 
         /// <summary>The device that triggered the last Build input, used to ignore mouse clicks on UI buttons.</summary>
         public InputDevice BuildDevice => build.activeControl?.device;
@@ -34,24 +36,31 @@ namespace Game.Player
             build.AddBinding("<Keyboard>/space");
             build.AddBinding("<Mouse>/leftButton");
             build.AddBinding("<Gamepad>/buttonSouth");
+
+            use = new InputAction("UseCola", InputActionType.Button);
+            use.AddBinding("<Keyboard>/e");
+            use.AddBinding("<Gamepad>/buttonWest");
         }
 
         void OnEnable()
         {
             move.Enable();
             build.Enable();
+            use.Enable();
         }
 
         void OnDisable()
         {
             move.Disable();
             build.Disable();
+            use.Disable();
         }
 
         void OnDestroy()
         {
             move.Dispose();
             build.Dispose();
+            use.Dispose();
         }
     }
 }

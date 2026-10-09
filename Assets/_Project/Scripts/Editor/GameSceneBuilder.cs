@@ -57,8 +57,13 @@ namespace Game.Editor
             var game = gameGo.AddComponent<GameController>();
             EditorWire.Set(gameGo.AddComponent<DevCommands>(), "game", game);
 
-            var player = BuildPlayer(game);
+            var player = BuildPlayer(game, palette);
             BuildCamera(player.transform);
+
+            var spawner = new GameObject("ColaSpawner").AddComponent<ColaSpawner>();
+            EditorWire.Set(spawner, "game", game);
+            EditorWire.Set(spawner, "player", player.transform);
+            EditorWire.Set(spawner, "palette", palette);
             var hud = BuildHud(font, outlineMat);
 
             EditorWire.SetArray(game, "sites", sites);
@@ -257,7 +262,7 @@ namespace Game.Editor
 
         // ---------- player / camera ----------
 
-        static PlayerController BuildPlayer(GameController game)
+        static PlayerController BuildPlayer(GameController game, ToonPalette palette)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ArtBuilder.WorkerPrefabPath);
             var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
@@ -277,6 +282,11 @@ namespace Game.Editor
             var hammer = go.AddComponent<PlayerHammer>();
             EditorWire.Set(hammer, "game", game);
             EditorWire.Set(hammer, "visual", visual);
+
+            // Small energy bar floating over the player's head (only visible while it's not full).
+            var bar = MeterBar.Create(go.transform, "EnergyBar", new Vector3(0f, 2.3f, 0f), 1.0f, 0.16f,
+                palette.barBack, palette.energyFill, palette.energyLow, hideWhenFull: true);
+            EditorWire.Set(hammer, "energyBar", bar);
             return controller;
         }
 
@@ -336,18 +346,40 @@ namespace Game.Editor
             var victoryText = Label(root, "Victory", font, outlineMat, 110, new Color(1f, 0.86f, 0.25f), TextAlignmentOptions.Center,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(1500f, 300f));
 
-            var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-290f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
-            var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(290f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            // Energy: player and the plot in reach.
+            var energyPanel = Panel(root, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -155f), new Vector2(380f, 150f));
+            EnergyRow(energyPanel, rounded, font, "ENERJİ", -10f, out _, out var playerFill, out var playerFillImage);
+            EnergyRow(energyPanel, rounded, font, "Şantiye", -80f, out var siteLabel, out var siteFill, out var siteFillImage);
+
+            var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(0f, 1f), new Vector2(40f, -320f), new Vector2(380f, 84f),
+                new Color(1f, 0.84f, 0.2f), 32, out var colaUseLabel);
+
+            var boostText = Label(root, "Boost", font, outlineMat, 60, new Color(1f, 0.6f, 0.15f), TextAlignmentOptions.Center,
+                new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(900f, 80f));
+
+            var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-470f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
+            var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(0f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            var colaBuyButton = UpgradeButton(root, "ColaBuyButton", rounded, font, new Vector2(470f, 50f), new Color(1f, 0.55f, 0.3f), out var colaBuyLabel);
 
             var hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "coinsText", coinsText);
             EditorWire.Set(hud, "buildingText", buildingText);
             EditorWire.Set(hud, "hintText", hintText);
             EditorWire.Set(hud, "victoryText", victoryText);
+            EditorWire.Set(hud, "boostText", boostText);
             EditorWire.Set(hud, "hammerButton", hammerButton);
             EditorWire.Set(hud, "hammerLabel", hammerLabel);
             EditorWire.Set(hud, "workerButton", workerButton);
             EditorWire.Set(hud, "workerLabel", workerLabel);
+            EditorWire.Set(hud, "colaBuyButton", colaBuyButton);
+            EditorWire.Set(hud, "colaBuyLabel", colaBuyLabel);
+            EditorWire.Set(hud, "colaUseButton", colaUseButton);
+            EditorWire.Set(hud, "colaUseLabel", colaUseLabel);
+            EditorWire.Set(hud, "playerEnergyFill", playerFill);
+            EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
+            EditorWire.Set(hud, "siteEnergyFill", siteFill);
+            EditorWire.Set(hud, "siteEnergyImage", siteFillImage);
+            EditorWire.Set(hud, "siteEnergyLabel", siteLabel);
             return hud;
         }
 
@@ -403,8 +435,15 @@ namespace Game.Editor
 
         static Button UpgradeButton(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Vector2 pos, Color tint, out TMP_Text label)
         {
-            var rt = Rect(parent, name, new Vector2(0.5f, 0f), pos, new Vector2(520f, 140f));
-            rt.pivot = new Vector2(0.5f, 0f);
+            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 0f), pos, new Vector2(440f, 140f), tint, 32, out label);
+            label.textWrappingMode = TextWrappingModes.Normal;
+            return button;
+        }
+
+        static Button TintedButton(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Vector2 anchor, Vector2 pos,
+            Vector2 size, Color tint, float fontSize, out TMP_Text label)
+        {
+            var rt = Rect(parent, name, anchor, pos, size);
             var img = rt.gameObject.AddComponent<Image>();
             img.sprite = sprite;
             img.type = Image.Type.Sliced;
@@ -422,10 +461,34 @@ namespace Game.Editor
                 fadeDuration = 0.08f,
             };
 
-            label = Label(rt, "Label", font, null, 34, InkColor, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500f, 120f));
+            label = Label(rt, "Label", font, null, fontSize, InkColor, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, size - new Vector2(20f, 10f));
             label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            label.textWrappingMode = TextWrappingModes.Normal;
             return button;
+        }
+
+        // Label on top, bar underneath; the fill stretches to its back image so the HUD can drive it with anchorMax.x.
+        static void EnergyRow(Transform panel, Sprite rounded, TMP_FontAsset font, string title, float y,
+            out TMP_Text label, out RectTransform fill, out Image fillImage)
+        {
+            label = Label(panel, title + "Label", font, null, 26, Color.white, TextAlignmentOptions.MidlineLeft,
+                new Vector2(0f, 1f), new Vector2(18f, y), new Vector2(340f, 32f));
+            label.text = title;
+            var back = Rect(panel, title + "Bar", new Vector2(0f, 1f), new Vector2(18f, y - 36f), new Vector2(344f, 24f));
+            var backImg = back.gameObject.AddComponent<Image>();
+            backImg.sprite = rounded;
+            backImg.type = Image.Type.Sliced;
+            backImg.pixelsPerUnitMultiplier = 4f;
+            backImg.color = new Color(0.08f, 0.06f, 0.12f, 0.9f);
+            backImg.raycastTarget = false;
+
+            fill = Rect(back, "Fill", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            fill.pivot = new Vector2(0f, 0.5f);
+            fill.anchorMin = new Vector2(0f, 0f);
+            fill.anchorMax = new Vector2(1f, 1f);
+            fill.offsetMin = new Vector2(3f, 3f);
+            fill.offsetMax = new Vector2(-3f, -3f);
+            fillImage = fill.gameObject.AddComponent<Image>();
+            fillImage.raycastTarget = false;
         }
     }
 }

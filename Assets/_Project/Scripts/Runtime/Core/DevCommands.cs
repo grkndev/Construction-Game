@@ -21,6 +21,7 @@ namespace Game.Core
             var shot = Arg(args, "-shot");
             var demo = Array.IndexOf(args, "-demo") >= 0;
             if (shot == null && !demo) yield break;
+            Application.runInBackground = true;   // automated runs must not stall when the window isn't focused
 
             if (demo) StartCoroutine(Demo());
 
@@ -40,14 +41,21 @@ namespace Game.Core
 
         IEnumerator Demo()
         {
-            // Pretend to be a fast player: ~8 hits per second, upgrades bought whenever affordable.
+            // Pretend to be a fast player: ~8 hits per second, upgrades bought whenever affordable, colas drunk when found.
             var wait = new WaitForSeconds(0.12f);
             while (!game.AllDone)
             {
-                var site = game.NearestWorkableSite(Vector3.zero, 1000f);   // any unfinished plot
-                if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up);
+                // Like a sensible player: finish the smallest plot that isn't resting.
+                Game.World.BuildSite site = null;
+                foreach (var candidate in game.Sites)
+                {
+                    if (candidate.State != Game.World.SiteState.Active || !candidate.Energy.CanSpend) continue;
+                    if (site == null || candidate.Plan.TotalWork < site.Plan.TotalWork) site = candidate;
+                }
+                if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up, byPlayer: true);
                 game.BuyWorker();
                 game.BuyHammer();
+                game.UseCola();
                 yield return wait;
             }
         }

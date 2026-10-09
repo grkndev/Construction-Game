@@ -177,6 +177,8 @@ namespace Game.Editor
             palette.barBack = Mat("BarBack", "#2B2233", thin, 0f);
             palette.barFill = Mat("BarFill", "#FFD62A", 0f, 0f);
             palette.marker = Mat("Marker", "#FFD62A");
+            palette.energyFill = Mat("EnergyFill", "#5BE37D", 0f, 0f);
+            palette.energyLow = Mat("EnergyLow", "#FF5A4F", 0f, 0f);
 
             EditorUtility.SetDirty(palette);
             AssetDatabase.SaveAssets();
@@ -227,7 +229,9 @@ namespace Game.Editor
             pivot.SetParent(root.transform, false);
             pivot.localPosition = new Vector3(0.55f, 0.85f, 0.15f);
             Prim.Cylinder(pivot, "Handle", new Vector3(0f, 0.42f, 0f), new Vector3(0.09f, 0.42f, 0.09f), p.hammerHandle);
-            Prim.Cube(pivot, "Head", new Vector3(0f, 0.9f, 0f), new Vector3(0.5f, 0.26f, 0.26f), p.hammerHead);
+            // The head's long axis points along the swing direction (local Z): a mallet strikes with its end face,
+            // and at impact (handle ~horizontal) the head stands upright instead of lying flat.
+            Prim.Cube(pivot, "Head", new Vector3(0f, 0.9f, 0f), new Vector3(0.28f, 0.3f, 0.58f), p.hammerHead);
 
             var visual = root.AddComponent<WorkerVisual>();
             EditorWire.Set(visual, "body", body);

@@ -41,3 +41,5 @@ MonoBehaviour:
   barBack: {fileID: 2100000, guid: b84c9003cb6944839bd92aaa2d6b682e, type: 2}
   barFill: {fileID: 2100000, guid: cda700fc376f54377914269f475d77f6, type: 2}
   marker: {fileID: 2100000, guid: 2510e37dd7a2642d78eee9ff771cf719, type: 2}
+  energyFill: {fileID: 2100000, guid: e93c2f068ac3041d1a84eca04f6db9ca, type: 2}
+  energyLow: {fileID: 2100000, guid: e09830141e5e94f8e93274160e05cae9, type: 2}

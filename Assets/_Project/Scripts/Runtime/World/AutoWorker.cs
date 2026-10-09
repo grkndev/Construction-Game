@@ -58,10 +58,18 @@ namespace Game.World
 
             timer += Time.deltaTime;
             if (timer < Balance.WorkerHitInterval) return;
-            timer = 0f;
-            visual.Swing();
+
             var point = Vector3.Lerp(transform.position, site.transform.position, 0.55f) + Vector3.up * 1.2f;
-            game.TryHit(site, Balance.WorkerPower(game.Hammer.Level), point);
+            var result = game.TryHit(site, Balance.WorkerPower(game.Hammer.Level), point, byPlayer: false);
+            if (result == HitResult.Hit)
+            {
+                timer = 0f;
+                visual.Swing();
+            }
+            else
+            {
+                timer = Balance.WorkerHitInterval - 0.3f;   // plot is resting: check back soon instead of waiting a full interval
+            }
         }
     }
 }

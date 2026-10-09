@@ -14,6 +14,8 @@ namespace Game.World
         [SerializeField] Transform hammerPivot;
 
         float move;
+        float tired;        // 0..1 smoothed
+        bool isTired;
         float swingTime = -1f;
         Vector3 bodyBasePos;
 
@@ -24,12 +26,19 @@ namespace Game.World
 
         public void Swing() => swingTime = 0f;
 
+        /// <summary>Slumps forward and pants while the player's energy is exhausted.</summary>
+        public void SetTired(bool value) => isTired = value;
+
         void Update()
         {
             var bob = Mathf.Abs(Mathf.Sin(Time.time * 11f)) * 0.1f * move;
             var squash = 1f + Mathf.Sin(Time.time * 22f) * 0.03f * move;
             body.localPosition = bodyBasePos + Vector3.up * bob;
             body.localScale = new Vector3(1f / Mathf.Sqrt(squash), squash, 1f / Mathf.Sqrt(squash));
+
+            tired = Mathf.MoveTowards(tired, isTired ? 1f : 0f, 4f * Time.deltaTime);
+            var pant = Mathf.Sin(Time.time * 14f) * 2f * tired;
+            body.localRotation = Quaternion.Euler(tired * 18f + pant, 0f, 0f);
 
             // Resting pose holds the hammer up; a swing goes up-back then slams down.
             var angle = -35f;
@@ -40,7 +49,7 @@ namespace Game.World
                 if (t >= 1f) swingTime = -1f;
                 else angle = t < 0.35f
                     ? Mathf.Lerp(-35f, -110f, Core.Easing.OutCubic(t / 0.35f))
-                    : Mathf.Lerp(-110f, 55f, Core.Easing.OutCubic((t - 0.35f) / 0.65f));
+                    : Mathf.Lerp(-110f, 70f, Core.Easing.OutCubic((t - 0.35f) / 0.65f));
             }
             hammerPivot.localRotation = Quaternion.Euler(angle, 0f, 0f);
         }

@@ -41,5 +41,7 @@ namespace Game.World
         public Material barBack;
         public Material barFill;
         public Material marker;
+        public Material energyFill;
+        public Material energyLow;
     }
 }

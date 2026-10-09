@@ -1,14 +1,17 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Game.UI;
 using Game.World;
 using UnityEngine;
 
 namespace Game.Core
 {
+    public enum HitResult { Hit, NoTarget, PlayerTired, SiteTired }
+
     /// <summary>
-    /// Scene-level composition root: owns the economy and upgrades (plain C# objects), wires plots to
-    /// the plans in <see cref="Balance"/>, hires workers and tells the HUD what to show.
+    /// Scene-level composition root: owns the economy, upgrades, energy and boost state (plain C# objects),
+    /// wires plots to the plans in <see cref="Balance"/>, hires workers and tells the HUD what to show.
     /// Everything it references is assigned in the scene by the editor builder, so there are no singletons.
     /// </summary>
     public sealed class GameController : MonoBehaviour
@@ -20,20 +23,29 @@ namespace Game.Core
         [SerializeField] GameHud hud;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
+        [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);
 
         public Economy Economy { get; } = new Economy();
         public UpgradeTrack Hammer { get; } = Balance.NewHammerTrack();
         public UpgradeTrack Workers { get; } = Balance.NewWorkerTrack();
+        public EnergyMeter PlayerEnergy { get; } = new EnergyMeter(Balance.PlayerEnergy);
+        public BoostTimer Boost { get; } = new BoostTimer();
+        public int ColaCount { get; private set; }
+        public long ColaPrice => Balance.ColaPrice(Hammer.Level);
         public int HammerPower => Balance.HammerPower(Hammer.Level);
+        public IReadOnlyList<BuildSite> Sites => sites;
+
         /// <summary>The plot the player is currently close enough to work on (null when out of reach). Set by PlayerHammer.</summary>
         public BuildSite FocusSite { get; set; }
         public bool AllDone { get; private set; }
         public int CompletedCount { get; private set; }
         public int TotalCount => sites.Length;
 
-        /// <summary>Raised when a plot finishes or everything is done.</summary>
-        public event Action SiteChanged;
+        /// <summary>Raised when something the HUD shows changes outside the economy: cola count, boost, plot finished.</summary>
+        public event Action StateChanged;
         public event Action<string> Hint;
+
+        int workersSpawned;
 
         void Awake()
         {
@@ -42,9 +54,16 @@ namespace Game.Core
                 sites[i].Initialize(Balance.Plans[i], i, sites[i].GetComponentInChildren<TMPro.TMP_Text>(true));
                 sites[i].Completed += OnSiteCompleted;
             }
+            Boost.Changed += () => StateChanged?.Invoke();
         }
 
         void Start() => hud.Bind(this);
+
+        void Update()
+        {
+            PlayerEnergy.Tick(Time.deltaTime);
+            Boost.Tick(Time.deltaTime);
+        }
 
         /// <summary>Nearest unfinished plot within <paramref name="radius"/> (flat distance), or null.</summary>
         public BuildSite NearestWorkableSite(Vector3 position, float radius)
@@ -77,16 +96,30 @@ namespace Game.Core
             return best;
         }
 
-        /// <summary>Applies one hit of <paramref name="power"/> work. Work equals coins earned.</summary>
-        public bool TryHit(BuildSite site, int power, Vector3 point)
+        /// <summary>
+        /// One hammer hit. Needs energy from the plot and, for the player, from the player; a boost (bought cola)
+        /// makes both free and doubles the player's hits. Work equals coins earned.
+        /// </summary>
+        public HitResult TryHit(BuildSite site, int power, Vector3 point, bool byPlayer)
         {
-            if (site == null || site.State != SiteState.Active) return false;
-            var applied = site.AddWork(power, point);
-            if (applied == 0) return false;
+            if (site == null || site.State != SiteState.Active) return HitResult.NoTarget;
 
+            var free = Boost.IsActive;
+            if (!free && byPlayer && !PlayerEnergy.CanSpend) return HitResult.PlayerTired;
+            if (!free && !site.Energy.CanSpend) return HitResult.SiteTired;
+
+            if (free && byPlayer) power *= Balance.BoostPowerMultiplier;
+            var applied = site.AddWork(power, point);
+            if (applied == 0) return HitResult.NoTarget;
+
+            if (!free)
+            {
+                if (byPlayer) PlayerEnergy.TrySpend();
+                site.Energy.TrySpend();
+            }
             Economy.Add(applied);
             Popup($"+{applied}", point, coinColor, 1f);
-            return true;
+            return HitResult.Hit;
         }
 
         void OnSiteCompleted(BuildSite site)
@@ -95,7 +128,7 @@ namespace Game.Core
             Economy.Add(site.Plan.CompletionBonus);
             Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(site.Plan.CompletionBonus)}",
                 site.transform.position + Vector3.up * 4.5f, bonusColor, 1.7f);
-            SiteChanged?.Invoke();
+            StateChanged?.Invoke();
             if (CompletedCount == sites.Length) StartCoroutine(FinishAfterDelay(1.4f));
         }
 
@@ -103,7 +136,7 @@ namespace Game.Core
         {
             yield return new WaitForSeconds(seconds);   // let the last confetti play before the victory text
             AllDone = true;
-            SiteChanged?.Invoke();
+            StateChanged?.Invoke();
         }
 
         public void BuyHammer()
@@ -117,7 +150,51 @@ namespace Game.Core
             var spawn = workerSpawn != null ? workerSpawn.position : Vector3.zero;
             var worker = Instantiate(workerPrefab, spawn, Quaternion.identity);
             worker.Initialize(this);
+            workersSpawned++;
             ShowHint("Yeni işçi işe başladı!");
+        }
+
+        // ---------- Sarı Kola ----------
+
+        /// <summary>Picked up from the island. False when the pockets are full.</summary>
+        public bool TryAddCola()
+        {
+            if (ColaCount >= Balance.MaxColaInventory)
+            {
+                ShowHint($"Cebin dolu ({ColaCount}/{Balance.MaxColaInventory}), önce bir kola iç (E)");
+                return false;
+            }
+            ColaCount++;
+            ShowHint($"Sarı Kola alındı! ({ColaCount}/{Balance.MaxColaInventory})  İçmek için E");
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>Drink a found cola: refills the player and every plot, no boost.</summary>
+        public void UseCola()
+        {
+            if (ColaCount <= 0) return;
+            ColaCount--;
+            RefillEnergy();
+            ShowHint("Sarı Kola! Enerji doldu.");
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>Buy and drink immediately: refills everything and also starts the "Coşku" boost.</summary>
+        public void BuyCola()
+        {
+            if (!Economy.TrySpend(ColaPrice)) return;
+            RefillEnergy();
+            Boost.Activate(Balance.BoostSeconds);
+            ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye boyunca vuruşların ×{Balance.BoostPowerMultiplier} ve yorulmuyorsun!");
+            if (FocusSite != null) Popup("COŞKU!", FocusSite.transform.position + Vector3.up * 5f, colaColor, 1.8f);
+            StateChanged?.Invoke();
+        }
+
+        void RefillEnergy()
+        {
+            PlayerEnergy.Refill();
+            foreach (var site in sites) site.Energy.Refill();
         }
 
         public void ShowHint(string text) => Hint?.Invoke(text);

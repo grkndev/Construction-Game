@@ -171,3 +171,139 @@ namespace Game.Tests
         }
     }
 }
+
+namespace Game.Tests
+{
+    public class EnergyMeterTests
+    {
+        // Small round numbers: 10 energy, 2 per action, rest after 1s at 4/s, no regen while acting, resume at 50%.
+        static EnergyMeter Meter(float activeRegen = 0f) =>
+            new EnergyMeter(new EnergySettings(max: 10f, cost: 2f, fullRegen: 4f, restDelay: 1f, activeRegen: activeRegen, resumeFraction: 0.5f));
+
+        [Test]
+        public void StartsFull_AndSpendingReducesIt()
+        {
+            var m = Meter();
+            Assert.AreEqual(1f, m.Fraction);
+            Assert.IsTrue(m.TrySpend());
+            Assert.AreEqual(8f, m.Value);
+        }
+
+        [Test]
+        public void DoesNotRegenerateWhileStillActing()
+        {
+            var m = Meter();
+            m.TrySpend();
+            m.Tick(0.5f);   // shorter than the rest delay
+            Assert.AreEqual(8f, m.Value, 1e-4);
+        }
+
+        [Test]
+        public void RegeneratesAfterRestDelay()
+        {
+            var m = Meter();
+            m.TrySpend();
+            m.Tick(1f);     // rest delay reached but no time elapsed beyond it yet
+            m.Tick(0.5f);   // 0.5s of full regen at 4/s = +2
+            Assert.AreEqual(10f, m.Value, 1e-4);
+        }
+
+        [Test]
+        public void ActiveRegen_AppliesBeforeTheRestDelay()
+        {
+            var m = Meter(activeRegen: 2f);
+            m.TrySpend();
+            m.Tick(0.5f);
+            Assert.AreEqual(9f, m.Value, 1e-4);
+        }
+
+        [Test]
+        public void RunningDry_LocksUntilResumeFraction()
+        {
+            var m = Meter();
+            for (var i = 0; i < 5; i++) Assert.IsTrue(m.TrySpend());   // 10 -> 0
+            Assert.IsTrue(m.IsExhausted);
+            Assert.IsFalse(m.TrySpend());
+
+            m.Tick(1f);       // rested, nothing regenerated yet
+            m.Tick(0.5f);     // +2: value 2, still below the 5 needed
+            Assert.IsTrue(m.IsExhausted);
+            m.Tick(1f);       // +4: value 6, above 50%
+            Assert.IsFalse(m.IsExhausted);
+            Assert.IsTrue(m.TrySpend());
+        }
+
+        [Test]
+        public void ExhaustsWhenLeftoverCannotPayForAnotherAction()
+        {
+            var m = new EnergyMeter(new EnergySettings(5f, 2f, 4f, 1f, 0f, 0.5f));
+            m.TrySpend();
+            m.TrySpend();   // 1 energy left, cost is 2
+            Assert.IsTrue(m.IsExhausted);
+        }
+
+        [Test]
+        public void Refill_FullyRestoresAndUnlocks()
+        {
+            var m = Meter();
+            for (var i = 0; i < 5; i++) m.TrySpend();
+            m.Refill();
+            Assert.AreEqual(1f, m.Fraction);
+            Assert.IsFalse(m.IsExhausted);
+            Assert.IsTrue(m.CanSpend);
+        }
+
+        [Test]
+        public void NeverExceedsMax()
+        {
+            var m = Meter();
+            m.Tick(100f);
+            Assert.AreEqual(10f, m.Value);
+        }
+    }
+
+    public class BoostTimerTests
+    {
+        [Test]
+        public void CountsDown_AndEnds()
+        {
+            var b = new BoostTimer();
+            b.Activate(2f);
+            Assert.IsTrue(b.IsActive);
+            b.Tick(1.5f);
+            Assert.IsTrue(b.IsActive);
+            b.Tick(1f);
+            Assert.IsFalse(b.IsActive);
+            Assert.AreEqual(0f, b.Remaining);
+        }
+
+        [Test]
+        public void ActivatingAgain_NeverShortensIt()
+        {
+            var b = new BoostTimer();
+            b.Activate(10f);
+            b.Activate(3f);
+            Assert.AreEqual(10f, b.Remaining);
+        }
+    }
+
+    public class ColaBalanceTests
+    {
+        [Test]
+        public void ColaPrice_GrowsWithHammerLevel_AndStartsCheap()
+        {
+            Assert.AreEqual(60, Balance.ColaPrice(0));
+            for (var l = 1; l <= 25; l++) Assert.Greater(Balance.ColaPrice(l), Balance.ColaPrice(l - 1));
+        }
+
+        [Test]
+        public void PlayerCanHitAFewTimesBeforeTiring()
+        {
+            // Sanity for the feel: a full bar must allow a decent burst, but not an endless one.
+            var m = new EnergyMeter(Balance.PlayerEnergy);
+            var hits = 0;
+            while (m.TrySpend()) hits++;
+            Assert.That(hits, Is.InRange(15, 40));
+        }
+    }
+}

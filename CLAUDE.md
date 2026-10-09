@@ -9,7 +9,10 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 ## Oyun
 - Küçük bir adada 5 inşaat alanı (plot). İşçiyi WASD / sol çubukla gezdir, aktif alanda **Space / sol tık / gamepad A** ile çekiç vur.
 - Her vuruş = ilerleme + o kadar para. Bina kat kat yükselir, bitince bonus ve konfeti. Sıradaki plot açılır.
-- Parayla: **Çekiç** (vuruş gücü) ve **İşçi** (otomatik çalışan yardımcı, en çok 8) yükseltmeleri.
+- 5 plotun hepsi baştan açık; oyuncu menzildeki en yakın plota vurur, işçiler en az işçisi olan plota dağılır.
+- **Enerji:** oyuncunun enerjisi vuruşla azalır, durunca dolar; bitince %40'a dolana kadar vuramaz. Her plotun (şantiye) kendi enerjisi var, oyuncu ve işçi vuruşları onu da harcar, bitince plot "dinleniyor". Bu yüzden plotlar arasında gezmek gerekir.
+- **Sarı Kola:** adada rastgele belirir, üstünden geçince cebe girer (en çok 3), **E / gamepad X** ile içilir → oyuncu + tüm plotların enerjisi dolar. Parayla alınan kola hemen içilir ve ayrıca 15 sn **Coşku** verir (vuruşlar ×2, enerji harcanmaz).
+- Parayla: **Çekiç** (vuruş gücü), **İşçi** (otomatik çalışan yardımcı, en çok 8) ve **Sarı Kola**.
 - 5 bina bitince "Şehir tamamlandı" görünür.
 
 ## Görsel stil
@@ -26,7 +29,7 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [-demo]` (oyunun kendi karesini yazar, `-demo` otomatik oynar). Masaüstü ekran görüntüsü alma.
 
 ## Mimari
-- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te.
+- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, EnergyMeter, BoostTimer, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te; değiştirirken enerjiyi de içeren bir simülasyonla (bkz. git geçmişi) süreyi kontrol et: enerji oyunu ~2.4x yavaşlatır.
 - `GameController` sahnenin kompozisyon kökü; singleton yok, referanslar sahnede `EditorWire` ile bağlanır.
 - `Player/`, `World/`, `UI/` MonoBehaviour katmanı. Yeni içerik (bina) = `Balance.Plans`'e satır.
 - Tween için DOTween yok (OpenUPM'den kalkmış); `Easing.cs` + Update tabanlı animasyonlar.

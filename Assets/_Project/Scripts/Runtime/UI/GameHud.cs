@@ -5,17 +5,31 @@ using UnityEngine.UI;
 
 namespace Game.UI
 {
-    /// <summary>Screen-space HUD: coins, current building, upgrade buttons, hints. It only reads game state and calls Buy*.</summary>
+    /// <summary>Screen-space HUD: coins, current building, energy bars, cola, upgrade buttons, hints. It only reads game state and calls Buy*/Use*.</summary>
     public sealed class GameHud : MonoBehaviour
     {
         [SerializeField] TMP_Text coinsText;
         [SerializeField] TMP_Text buildingText;
         [SerializeField] TMP_Text hintText;
         [SerializeField] TMP_Text victoryText;
+        [SerializeField] TMP_Text boostText;
         [SerializeField] Button hammerButton;
         [SerializeField] TMP_Text hammerLabel;
         [SerializeField] Button workerButton;
         [SerializeField] TMP_Text workerLabel;
+        [SerializeField] Button colaBuyButton;
+        [SerializeField] TMP_Text colaBuyLabel;
+        [SerializeField] Button colaUseButton;
+        [SerializeField] TMP_Text colaUseLabel;
+        [SerializeField] RectTransform playerEnergyFill;
+        [SerializeField] Image playerEnergyImage;
+        [SerializeField] RectTransform siteEnergyFill;
+        [SerializeField] Image siteEnergyImage;
+        [SerializeField] TMP_Text siteEnergyLabel;
+
+        static readonly Color Good = new Color(0.36f, 0.89f, 0.49f);
+        static readonly Color Warn = new Color(1f, 0.82f, 0.25f);
+        static readonly Color Low = new Color(1f, 0.35f, 0.3f);
 
         GameController game;
         float hintTimer;
@@ -26,11 +40,13 @@ namespace Game.UI
             game.Economy.Changed += Refresh;
             game.Hammer.Changed += Refresh;
             game.Workers.Changed += Refresh;
-            game.SiteChanged += Refresh;
+            game.StateChanged += Refresh;
             game.Hint += ShowHint;
 
             hammerButton.onClick.AddListener(game.BuyHammer);
             workerButton.onClick.AddListener(game.BuyWorker);
+            colaBuyButton.onClick.AddListener(game.BuyCola);
+            colaUseButton.onClick.AddListener(game.UseCola);
             victoryText.gameObject.SetActive(false);
 
             ShowHint("WASD / sol çubuk: yürü    SPACE / tık / A: çekiç vur    İstediğin inşaata git!", 7f);
@@ -43,11 +59,11 @@ namespace Game.UI
             game.Economy.Changed -= Refresh;
             game.Hammer.Changed -= Refresh;
             game.Workers.Changed -= Refresh;
-            game.SiteChanged -= Refresh;
+            game.StateChanged -= Refresh;
             game.Hint -= ShowHint;
         }
 
-        void ShowHint(string text) => ShowHint(text, 2.5f);
+        void ShowHint(string text) => ShowHint(text, 2.8f);
 
         void ShowHint(string text, float seconds)
         {
@@ -65,12 +81,35 @@ namespace Game.UI
                 hintText.alpha = Mathf.Clamp01(hintTimer * 2f);
             }
 
-            // The text changes on every hit; cheap enough to refresh each frame and avoids an extra event.
-            if (game.AllDone) return;
+            // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
+            SetBar(playerEnergyFill, playerEnergyImage, game.PlayerEnergy.Fraction, game.PlayerEnergy.IsExhausted && !game.Boost.IsActive);
+
             var focus = game.FocusSite;
+            if (focus != null)
+            {
+                siteEnergyLabel.text = focus.Energy.IsExhausted ? "Şantiye dinleniyor" : "Şantiye";
+                SetBar(siteEnergyFill, siteEnergyImage, focus.Energy.Fraction, focus.Energy.IsExhausted);
+            }
+            else
+            {
+                siteEnergyLabel.text = "Şantiye";
+                SetBar(siteEnergyFill, siteEnergyImage, 0f, false);
+            }
+
+            boostText.gameObject.SetActive(game.Boost.IsActive);
+            if (game.Boost.IsActive) boostText.text = $"COŞKU!  {game.Boost.Remaining:0.0}s";
+
+            if (game.AllDone) return;
             buildingText.text = focus != null
                 ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
                 : $"İnşaatlar  {game.CompletedCount}/{game.TotalCount}";
+        }
+
+        static void SetBar(RectTransform fill, Image image, float fraction, bool exhausted)
+        {
+            fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
+            image.enabled = fraction > 0.02f;   // a negative-width rect would draw mirrored at 0
+            image.color = exhausted || fraction < 0.25f ? Low : fraction < 0.5f ? Warn : Good;
         }
 
         void Refresh()
@@ -86,6 +125,12 @@ namespace Game.UI
                 ? $"İŞÇİ  {game.Workers.Level}\nEkip tamam"
                 : $"İŞÇİ AL  ({game.Workers.Level}/{Balance.MaxWorkers})\n{NumberFormat.Compact(game.Workers.NextCost)}";
             workerButton.interactable = !game.Workers.IsMaxed && game.Economy.CanAfford(game.Workers.NextCost);
+
+            colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
+            colaBuyButton.interactable = game.Economy.CanAfford(game.ColaPrice);
+
+            colaUseLabel.text = $"Sarı Kola  x{game.ColaCount}   [E]";
+            colaUseButton.interactable = game.ColaCount > 0;
 
             if (game.AllDone)
             {
