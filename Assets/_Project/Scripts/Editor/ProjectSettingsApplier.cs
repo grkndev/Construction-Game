@@ -14,6 +14,10 @@ namespace Game.Editor
         public const int InputSystemOnly = 1;
         public const string VisibleMetaFiles = "Visible Meta Files";
 
+        // Standalone window: 16:9 like the 1920x1080 UI reference, resizable, fits a 13" laptop screen.
+        public const int WindowWidth = 1440;
+        public const int WindowHeight = 810;
+
         [MenuItem("Tools/Project/Apply Settings")]
         public static void Apply()
         {
@@ -29,6 +33,8 @@ namespace Game.Editor
                 Debug.Log("[Settings] Version control mode -> Visible Meta Files");
             }
 
+            ApplyWindow();
+
             if (GetActiveInputHandler() != InputSystemOnly)
             {
                 var so = LoadPlayerSettings();
@@ -38,6 +44,20 @@ namespace Game.Editor
                 // The Unity backend only switches handlers after a domain restart / editor restart.
                 Debug.LogWarning("[Settings] Active Input Handling -> Input System Package. Restart the editor for it to take effect.");
             }
+        }
+
+        static void ApplyWindow()
+        {
+            if (PlayerSettings.defaultScreenWidth == WindowWidth && PlayerSettings.defaultScreenHeight == WindowHeight
+                && PlayerSettings.resizableWindow && PlayerSettings.fullScreenMode == FullScreenMode.Windowed)
+                return;
+
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.defaultScreenWidth = WindowWidth;
+            PlayerSettings.defaultScreenHeight = WindowHeight;
+            PlayerSettings.resizableWindow = true;
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Settings] Standalone window -> {WindowWidth}x{WindowHeight}, windowed, resizable");
         }
 
         public static int GetActiveInputHandler() =>
