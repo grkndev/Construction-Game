@@ -29,7 +29,7 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [-demo]` (oyunun kendi karesini yazar, `-demo` otomatik oynar). Masaüstü ekran görüntüsü alma.
 
 ## Mimari
-- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, EnergyMeter, BoostTimer, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te; değiştirirken enerjiyi de içeren bir simülasyonla (bkz. git geçmişi) süreyi kontrol et: enerji oyunu ~2.4x yavaşlatır.
+- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, EnergyMeter, BoostTimer, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te; değiştirirken `python3 tools/balance_sim.py` ile (enerjiyi de modeller) toplam süreyi kontrol et: enerji oyunu ~2.4x yavaşlatır.
 - `GameController` sahnenin kompozisyon kökü; singleton yok, referanslar sahnede `EditorWire` ile bağlanır.
 - `Player/`, `World/`, `UI/` MonoBehaviour katmanı. Yeni içerik (bina) = `Balance.Plans`'e satır.
 - Tween için DOTween yok (OpenUPM'den kalkmış); `Easing.cs` + Update tabanlı animasyonlar.
