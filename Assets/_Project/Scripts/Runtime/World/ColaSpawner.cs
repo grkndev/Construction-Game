@@ -20,11 +20,28 @@ namespace Game.World
         float timer;
         bool announced;
 
-        void Start() => timer = Balance.ColaFirstSpawn;
+        void Start()
+        {
+            timer = Balance.ColaFirstSpawn;
+            game.ModeChanged += OnModeChanged;
+        }
+
+        void OnDestroy()
+        {
+            if (game != null) game.ModeChanged -= OnModeChanged;
+        }
+
+        // Cans belong to the district they were dropped in: leaving (or entering) starts from a clean slate.
+        void OnModeChanged()
+        {
+            foreach (var pickup in alive) if (pickup != null) Destroy(pickup.gameObject);
+            alive.Clear();
+            timer = Balance.ColaFirstSpawn;
+        }
 
         void Update()
         {
-            if (game.AllDone) return;
+            if (!game.InDistrict) return;
 
             timer -= Time.deltaTime;
             if (timer <= 0f)
@@ -51,7 +68,7 @@ namespace Game.World
             {
                 var angle = Random.value * Mathf.PI * 2f;
                 var radius = Mathf.Sqrt(Random.Range(0.1f, 1f)) * islandRadius;
-                var point = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                var point = game.CurrentDistrict.Center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
                 if (!IsFree(point)) continue;
 
                 var pickup = ColaPickup.Spawn(point, palette);
@@ -60,7 +77,7 @@ namespace Game.World
                 if (!announced)
                 {
                     announced = true;
-                    game.ShowHint("Haritada bir Sarı Kola belirdi! Üstünden geç, E ile iç.");
+                    game.ShowHint("Haritada bir Sarı Kola belirdi! Üstünden geç, sonra iç.");
                 }
                 return;
             }

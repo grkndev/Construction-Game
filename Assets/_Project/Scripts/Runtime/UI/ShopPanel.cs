@@ -35,9 +35,6 @@ namespace Game.UI
         {
             game = controller;
             game.Economy.Changed += Refresh;
-            game.Hammer.Changed += Refresh;
-            game.Workers.Changed += Refresh;
-            game.Stamina.Changed += Refresh;
             game.StateChanged += Refresh;
             game.ShopToggleRequested += Toggle;
 
@@ -57,9 +54,6 @@ namespace Game.UI
         {
             if (game == null) return;
             game.Economy.Changed -= Refresh;
-            game.Hammer.Changed -= Refresh;
-            game.Workers.Changed -= Refresh;
-            game.Stamina.Changed -= Refresh;
             game.StateChanged -= Refresh;
             game.ShopToggleRequested -= Toggle;
         }
@@ -71,6 +65,13 @@ namespace Game.UI
         }
 
         public void Close() => open = false;
+
+        public void HideImmediate()
+        {
+            open = false;
+            slide = 0f;
+            Apply();
+        }
 
         void Update()
         {
@@ -88,6 +89,7 @@ namespace Game.UI
 
         void Refresh()
         {
+            if (!game.InDistrict) return;   // upgrades belong to a district; nothing to show on the dashboard
             hammerLabel.text = game.Hammer.IsMaxed
                 ? "ÇEKİÇ\nEn yüksek seviye"
                 : $"ÇEKİÇ  Sv.{game.Hammer.Level + 1}\nVuruş {game.BaseHammerPower} (+1)  •  {NumberFormat.Compact(game.Hammer.NextCost)}";

@@ -164,6 +164,11 @@ namespace Game.Editor
             palette.crate = Mat("Crate", "#E0A867");
             palette.cone = Mat("Cone", "#FF7F32");
             palette.stone = Mat("Stone", "#C3C5D4");
+            palette.districtGround = new[]
+            {
+                Mat("GroundSahil", "#A6E26A", 0.003f), Mat("GroundMerkez", "#86DB5B", 0.003f), Mat("GroundLiman", "#B7C6DA", 0.003f),
+                Mat("GroundTepe", "#6FCB74", 0.003f), Mat("GroundSanayi", "#D3BC85", 0.003f),
+            };
 
             palette.walls = new[]
             {

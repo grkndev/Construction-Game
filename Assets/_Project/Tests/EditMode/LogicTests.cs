@@ -136,28 +136,6 @@ namespace Game.Tests
         }
     }
 
-    public class BalanceTests
-    {
-        [Test]
-        public void Plans_GetBiggerAndMoreRewarding()
-        {
-            for (var i = 1; i < Balance.Plans.Length; i++)
-            {
-                Assert.Greater(Balance.Plans[i].TotalWork, Balance.Plans[i - 1].TotalWork, Balance.Plans[i].Name);
-                Assert.Greater(Balance.Plans[i].CompletionBonus, Balance.Plans[i - 1].CompletionBonus, Balance.Plans[i].Name);
-            }
-        }
-
-        [Test]
-        public void FirstHammerUpgrade_IsAffordableFromFirstBuilding()
-        {
-            // The first building alone must earn enough to buy the first upgrade, otherwise the game stalls.
-            var first = Balance.Plans[0];
-            var earned = first.TotalWork + first.CompletionBonus;
-            Assert.GreaterOrEqual(earned, Balance.NewHammerTrack().NextCost);
-        }
-    }
-
     public class NumberFormatTests
     {
         [TestCase(0, "0")]

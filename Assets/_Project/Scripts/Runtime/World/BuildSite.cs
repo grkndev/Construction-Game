@@ -43,6 +43,7 @@ namespace Game.World
         public bool IsComplete => progress != null && progress.IsComplete;
         public float Fraction => progress?.Fraction ?? 0f;
         public int FloorsBuilt => progress?.FloorsBuilt ?? 0;
+        public int Work => progress?.Work ?? 0;
 
         public event Action<BuildSite> Completed;
 
@@ -69,6 +70,17 @@ namespace Game.World
 
             Build();
             SetState(SiteState.Active);
+        }
+
+        /// <summary>Puts a saved building back as it was: floors (and the roof when finished) are simply there, no pop-in or confetti.</summary>
+        public void Restore(int work)
+        {
+            progress.Restore(work);
+            for (var i = 0; i < progress.FloorsBuilt; i++) floors[i].gameObject.SetActive(true);
+            SetBarFraction(progress.Fraction);
+            if (!progress.IsComplete) return;
+            roof.gameObject.SetActive(true);
+            SetState(SiteState.Done);
         }
 
         void Build()

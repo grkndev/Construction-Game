@@ -1,6 +1,8 @@
 using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.SceneManagement;
+using Game.World;
 using Game.Core;
 using Game.Editor;
 
@@ -47,6 +49,22 @@ namespace Game.Tests
         public void MainScene_Exists()
         {
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<SceneAsset>(GameSceneBuilder.ScenePath));
+        }
+
+        [Test]
+        public void MainScene_HasOneDistrictPerBalanceEntry_WithTheirPlots()
+        {
+            var scene = EditorSceneManager.OpenScene(GameSceneBuilder.ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                var districts = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<District>(true)).ToArray();
+                Assert.AreEqual(Balance.Districts.Length, districts.Length);
+                foreach (var district in districts) Assert.AreEqual(3, district.Sites.Length, district.name);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
         }
     }
 }

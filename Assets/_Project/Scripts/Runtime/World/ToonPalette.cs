@@ -19,6 +19,7 @@ namespace Game.World
         public Material crate;
         public Material cone;
         public Material stone;
+        public Material[] districtGround;   // top of each district's island, one tint per district
 
         [Header("Construction")]
         public Material[] walls;       // one per building plan

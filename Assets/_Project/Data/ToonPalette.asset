@@ -20,6 +20,12 @@ MonoBehaviour:
   crate: {fileID: 2100000, guid: 3a7dc6d3c10af49c5931c678a7ebd384, type: 2}
   cone: {fileID: 2100000, guid: 33f25b61a16c84f89a3bbd0b6b0361c7, type: 2}
   stone: {fileID: 2100000, guid: 91f8ee61fd70f4483bf9706f9c3f126c, type: 2}
+  districtGround:
+  - {fileID: 2100000, guid: dce36e24aa90b4cff8e39391da5bccc1, type: 2}
+  - {fileID: 2100000, guid: b00b4b983de364fd4850c83ebe95f332, type: 2}
+  - {fileID: 2100000, guid: 1438456d960fb4cba9557385665679aa, type: 2}
+  - {fileID: 2100000, guid: 789e7a29068634d62a0dc55b6364670e, type: 2}
+  - {fileID: 2100000, guid: afd0714511fd54d64b443634ddda84fb, type: 2}
   walls:
   - {fileID: 2100000, guid: 80d628ea93d6e4ae48ae939b3a4fe559, type: 2}
   - {fileID: 2100000, guid: 444ec8f08e5534fb2a90cb5861c5ebc9, type: 2}

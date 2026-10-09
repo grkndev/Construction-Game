@@ -69,7 +69,7 @@ namespace Game.World
             if (timer < Balance.WorkerHitInterval) return;
 
             var point = Vector3.Lerp(transform.position, site.transform.position, 0.55f) + Vector3.up * 1.2f;
-            var result = game.TryHit(site, Balance.WorkerPower(game.EffectiveLevel), point, character);
+            var result = game.TryHit(site, game.WorkerPower, point, character);
             if (result == HitResult.Hit)
             {
                 timer = 0f;

@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
@@ -8,8 +7,10 @@ namespace Game.Core
     /// <summary>
     /// Command-line hooks for automated checks of a built player (no effect unless the flags are passed):
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
-    /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-shop</c> opens the shop panel; <c>-demo</c> auto-plays by standing next to the active plot (the
-    /// player hammers automatically, like in real play) and buying upgrades, which exercises the whole loop without a human.
+    /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
+    /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N,
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins first, <c>-shop</c> opens the shop panel.
+    /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
     {
@@ -18,43 +19,63 @@ namespace Game.Core
 
         IEnumerator Start()
         {
-            var args = Environment.GetCommandLineArgs();
-            var shot = Arg(args, "-shot");
-            var demo = Array.IndexOf(args, "-demo") >= 0;
-            var openShop = Array.IndexOf(args, "-shop") >= 0;
+            var shot = LaunchArgs.Value("-shot");
+            var demo = LaunchArgs.Has("-demo");
             if (shot == null && !demo) yield break;
             Application.runInBackground = true;   // automated runs must not stall when the window isn't focused
+            if (float.TryParse(LaunchArgs.Value("-speed"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var speed) && speed > 0f)
+                Time.timeScale = speed;   // fast-forward long automated runs (the demo plays a whole city)
 
+            yield return null;   // let GameController.Start build the dashboard first
+            if (int.TryParse(LaunchArgs.Value("-xp"), out var xp)) game.Level.Add(xp);
+            if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);
+            if (int.TryParse(LaunchArgs.Value("-enter"), out var district)) game.EnterDistrict(district);
+            if (LaunchArgs.Has("-shop")) game.ToggleShop();
             if (demo) StartCoroutine(Demo());
-            if (openShop) game.ToggleShop();   // so a screenshot can show the shop panel
 
             if (shot == null) yield break;
-            float.TryParse(Arg(args, "-shotDelay"), System.Globalization.NumberStyles.Float,
+            float.TryParse(LaunchArgs.Value("-shotDelay"), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var delay);
             yield return new WaitForSeconds(Mathf.Max(1f, delay));
             yield return new WaitForEndOfFrame();
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
             File.WriteAllBytes(shot, tex.EncodeToPNG());
-            var spread = string.Join(",", System.Array.ConvertAll(
-                FindObjectsByType<Game.World.BuildSite>(FindObjectsSortMode.InstanceID), x => $"{x.Plan.Name}:{x.AssignedWorkers}{(x.IsComplete ? "(done)" : "")}"));
             var resting = 0;
             foreach (var c in FindObjectsByType<Game.World.Character>(FindObjectsSortMode.None)) if (c.Energy.IsExhausted) resting++;
-            Debug.Log($"[Dev] workers per plot: {spread}; characters resting: {resting}");
-            Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, done={game.CompletedCount}/{game.TotalCount}");
+            var progress = new System.Text.StringBuilder();
+            for (var i = 0; i < game.Districts.Count; i++)
+                progress.Append($"{Balance.Districts[i].Name}:{game.StateOf(i).CompletedCount}/{game.StateOf(i).PlotCount} ");
+            Debug.Log($"[Dev] mode={game.Mode} level={game.Level.Level} xp={game.Level.Xp} characters resting={resting}; {progress}");
+            Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, cityComplete={game.CityComplete}");
             Application.Quit();
         }
 
         IEnumerator Demo()
         {
-            // Pretend to be a fast player: walks (teleports) to the plot so the automatic hammer does the hitting,
-            // upgrades bought whenever affordable, colas drunk when found.
+            // Pretend to be a fast player: visits the districts in order, stands next to the smallest unfinished plot
+            // (the player hammers by itself), buys upgrades whenever affordable, drinks colas when found.
             var wait = new WaitForSeconds(0.12f);
             var elapsed = 0f;
             var boosted = false;
-            while (!game.AllDone)
+            while (!game.CityComplete)
             {
+                if (!game.InDistrict)
+                {
+                    for (var i = 0; i < game.Districts.Count; i++)
+                    {
+                        if (!game.IsUnlocked(i) || game.StateOf(i).IsComplete) continue;
+                        game.EnterDistrict(i);
+                        elapsed = 0f;
+                        boosted = false;
+                        break;
+                    }
+                    yield return wait;
+                    continue;
+                }
+
                 elapsed += 0.12f;
-                if (!boosted && elapsed > 20f)   // exercise the bought-cola path once so its effects show up in screenshots
+                if (!boosted && elapsed > 20f)   // exercise the bought-cola path once per district so its effects show up in screenshots
                 {
                     boosted = true;
                     game.Economy.Add(game.ColaPrice);
@@ -67,7 +88,14 @@ namespace Game.Core
                     if (candidate.State != Game.World.SiteState.Active) continue;
                     if (site == null || candidate.Plan.TotalWork < site.Plan.TotalWork) site = candidate;
                 }
-                if (site != null) StandNextTo(site);
+                if (site == null)
+                {
+                    yield return new WaitForSeconds(1.2f);   // let the last confetti play
+                    game.ExitToDashboard();
+                    yield return new WaitForSeconds(1.5f);   // and let the dashboard be seen
+                    continue;
+                }
+                StandNextTo(site);
                 game.BuyWorker();
                 game.BuyHammer();
                 game.BuyStamina();
@@ -79,7 +107,7 @@ namespace Game.Core
         // Puts the player a little in front of the plot (towards the island centre) so it is inside the work radius.
         void StandNextTo(Game.World.BuildSite site)
         {
-            var toCentre = -site.transform.position;
+            var toCentre = game.CurrentDistrict.Center - site.transform.position;
             toCentre.y = 0f;
             var spot = site.transform.position + toCentre.normalized * 2.5f;
             if ((player.transform.position - spot).sqrMagnitude < 1f) return;
@@ -88,12 +116,6 @@ namespace Game.Core
             controller.enabled = false;
             player.transform.position = new Vector3(spot.x, player.transform.position.y, spot.z);
             controller.enabled = true;
-        }
-
-        static string Arg(string[] args, string name)
-        {
-            var i = Array.IndexOf(args, name);
-            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         }
     }
 }

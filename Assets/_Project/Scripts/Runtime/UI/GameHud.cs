@@ -16,6 +16,12 @@ namespace Game.UI
         [SerializeField] UiPlate hintPlate;
         [SerializeField] UiPlate victoryPlate;
         [SerializeField] UiPlate boostPlate;
+        [SerializeField] GameObject districtGroup;     // everything that only makes sense inside a district
+        [SerializeField] UiPlate levelPlate;
+        [SerializeField] Button exitButton;
+        [SerializeField] TMP_Text levelLabel;
+        [SerializeField] RectTransform levelFill;
+        [SerializeField] Image levelFillImage;
         [SerializeField] ShopPanel shop;
         [SerializeField] Button shopButton;
         [SerializeField] Button colaUseButton;
@@ -31,23 +37,49 @@ namespace Game.UI
 
         GameController game;
         float hintTimer;
+        float levelTimer;
 
         public void Bind(GameController controller)
         {
             game = controller;
             game.Economy.Changed += Refresh;
             game.StateChanged += Refresh;
+            game.ModeChanged += OnModeChanged;
+            game.LeveledUp += OnLeveledUp;
+            game.Level.Changed += Refresh;
             game.Hint += ShowHint;
 
             shop.Bind(game);
             shopButton.onClick.AddListener(shop.Toggle);
+            exitButton.onClick.AddListener(game.ExitToDashboard);
+            levelPlate.Text = "";
             colaUseButton.onClick.AddListener(game.UseCola);
             victoryPlate.Text = "";
 
+            OnModeChanged();
+            Refresh();
+        }
+
+        void OnModeChanged()
+        {
+            districtGroup.SetActive(game.InDistrict);
+            if (!game.InDistrict)
+            {
+                shop.HideImmediate();
+                buildingPlate.Text = "";
+                boostPlate.Text = "";
+                return;
+            }
             ShowHint(Application.isMobilePlatform
                 ? "Ekran çubuğuyla yürü    İnşaata yaklaşınca otomatik çalışırsın"
-                : "WASD: yürü    İnşaata yaklaşınca otomatik çalışırsın    Mağaza: B    Kola: E", 7f);
-            Refresh();
+                : "WASD: yürü    İnşaata yaklaşınca otomatik çalışırsın    Mağaza: B    Kola: E", 5f);
+        }
+
+        void OnLeveledUp(int level)
+        {
+            levelPlate.Text = $"SEVİYE {level}!";
+            levelPlate.Alpha = 1f;
+            levelTimer = 2.5f;
         }
 
         void OnDestroy()
@@ -55,6 +87,9 @@ namespace Game.UI
             if (game == null) return;
             game.Economy.Changed -= Refresh;
             game.StateChanged -= Refresh;
+            game.ModeChanged -= OnModeChanged;
+            game.LeveledUp -= OnLeveledUp;
+            game.Level.Changed -= Refresh;
             game.Hint -= ShowHint;
         }
 
@@ -78,6 +113,15 @@ namespace Game.UI
                 if (hintTimer <= 0f) hintPlate.Text = "";
             }
 
+            if (levelTimer > 0f)
+            {
+                levelTimer -= Time.deltaTime;
+                levelPlate.Alpha = Mathf.Clamp01(levelTimer * 2f);
+                if (levelTimer <= 0f) levelPlate.Text = "";
+            }
+
+            if (!game.InDistrict) return;
+
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
             var energy = game.PlayerEnergy;
             SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
@@ -90,11 +134,11 @@ namespace Game.UI
             else if (game.LevelBuff.IsActive) boostPlate.Text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
             else boostPlate.Text = "";
 
-            if (game.AllDone) return;
+            if (game.CityComplete) return;
             var focus = game.FocusSite;
             buildingPlate.Text = focus != null
                 ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
-                : $"İnşaatlar  {game.CompletedCount}/{game.TotalCount}";
+                : $"{game.CurrentState.Def.Name}  {game.CompletedCount}/{game.TotalCount}";
         }
 
         static void SetBar(RectTransform fill, Image image, float fraction, bool exhausted)
@@ -108,10 +152,15 @@ namespace Game.UI
         {
             coinsText.text = NumberFormat.Compact(game.Economy.Coins);
 
+            var level = game.Level;
+            levelLabel.text = level.IsMax ? $"SEVİYE {level.Level}  (EN YÜKSEK)" : $"SEVİYE {level.Level}   {level.XpIntoLevel}/{level.XpForLevel}";
+            levelFill.anchorMax = new Vector2(Mathf.Clamp01(level.Fraction), 1f);
+            levelFillImage.enabled = level.Fraction > 0.02f;
+
             colaUseLabel.text = $"Sarı Kola  x{game.ColaCount}";
             colaUseButton.interactable = game.ColaCount > 0;
 
-            if (game.AllDone)
+            if (game.CityComplete)
             {
                 buildingPlate.Text = "";
                 victoryPlate.Text = "Şehir tamamlandı!\nHarika iş çıkardın";
