@@ -35,7 +35,7 @@ namespace Game.Player
             game.FocusSite = site;
 
             // Holding repeats at the cooldown rate; fresh presses may interrupt a little early so rapid clicking feels responsive.
-            var cooldownLimit = Balance.HitCooldown * (game.Boost.IsActive ? 0.7f : 1f);
+            var cooldownLimit = Balance.HitCooldown / character.SpeedMultiplier;
             var wants = input.BuildPressedThisFrame ? cooldown <= cooldownLimit * 0.5f
                                                     : input.BuildHeld && cooldown <= 0f;
             if (!wants) return;

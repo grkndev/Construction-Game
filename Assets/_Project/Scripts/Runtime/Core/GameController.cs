@@ -29,11 +29,18 @@ namespace Game.Core
         public Economy Economy { get; } = new Economy();
         public UpgradeTrack Hammer { get; } = Balance.NewHammerTrack();
         public UpgradeTrack Workers { get; } = Balance.NewWorkerTrack();
+        public UpgradeTrack Stamina { get; } = Balance.NewStaminaTrack();
         public EnergyMeter PlayerEnergy => player.Energy;
+        /// <summary>Coşku: speed-up and free energy for everyone (bought cola only).</summary>
         public BoostTimer Boost { get; } = new BoostTimer();
+        /// <summary>Temporary level bonus from any cola.</summary>
+        public BoostTimer LevelBuff { get; } = new BoostTimer();
         public int ColaCount { get; private set; }
         public long ColaPrice => Balance.ColaPrice(Hammer.Level);
-        public int HammerPower => Balance.HammerPower(Hammer.Level);
+        /// <summary>Hammer level including the temporary cola bonus; this is what hits actually use.</summary>
+        public int EffectiveLevel => Hammer.Level + (LevelBuff.IsActive ? Balance.LevelBonus : 0);
+        public int HammerPower => Balance.HammerPower(EffectiveLevel);
+        public int BaseHammerPower => Balance.HammerPower(Hammer.Level);
         public IReadOnlyList<BuildSite> Sites => sites;
 
         /// <summary>The plot the player is currently close enough to work on (null when out of reach). Set by PlayerHammer.</summary>
@@ -55,7 +62,8 @@ namespace Game.Core
                 sites[i].Initialize(Balance.Plans[i], i, sites[i].GetComponentInChildren<TMPro.TMP_Text>(true));
                 sites[i].Completed += OnSiteCompleted;
             }
-            Boost.Changed += () => StateChanged?.Invoke();
+            Boost.Changed += OnBuffsChanged;
+            LevelBuff.Changed += OnBuffsChanged;
         }
 
         void Start() => hud.Bind(this);
@@ -63,6 +71,7 @@ namespace Game.Core
         void Update()
         {
             Boost.Tick(Time.deltaTime);
+            LevelBuff.Tick(Time.deltaTime);
         }
 
         /// <summary>Nearest unfinished plot within <paramref name="radius"/> (flat distance), or null.</summary>
@@ -98,7 +107,7 @@ namespace Game.Core
 
         /// <summary>
         /// One hammer hit by <paramref name="actor"/>. It costs the actor's own energy; a boost (bought cola)
-        /// makes hits free for everyone and doubles the player's. Work equals coins earned.
+        /// makes hits free for everyone. Work equals coins earned.
         /// </summary>
         public HitResult TryHit(BuildSite site, int power, Vector3 point, Character actor)
         {
@@ -107,7 +116,6 @@ namespace Game.Core
             var free = Boost.IsActive;
             if (!free && !actor.Energy.CanSpend) return HitResult.Tired;
 
-            if (free && actor.IsPlayer) power *= Balance.BoostPowerMultiplier;
             var applied = site.AddWork(power, point);
             if (applied == 0) return HitResult.NoTarget;
 
@@ -145,8 +153,16 @@ namespace Game.Core
             var spawn = workerSpawn != null ? workerSpawn.position : Vector3.zero;
             var worker = Instantiate(workerPrefab, spawn, Quaternion.identity);
             worker.Initialize(this);
+            ApplyEffectsTo(worker.GetComponent<Character>());
             workersSpawned++;
             ShowHint("Yeni işçi işe başladı!");
+        }
+
+        public void BuyStamina()
+        {
+            if (!Stamina.TryBuy(Economy)) return;
+            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.ApplyStamina(Stamina.Level);
+            ShowHint($"Dayanıklılık arttı! Herkesin enerjisi +%{Mathf.RoundToInt(Stamina.Level * 15f)} kapasite");
         }
 
         // ---------- Sarı Kola ----------
@@ -171,7 +187,8 @@ namespace Game.Core
             if (ColaCount <= 0) return;
             ColaCount--;
             RefillEnergy();
-            ShowHint("Sarı Kola! Herkesin enerjisi doldu.");
+            LevelBuff.Activate(Balance.ColaLevelSeconds);
+            ShowHint($"Sarı Kola! Herkesin enerjisi doldu, {Balance.ColaLevelSeconds:0} sn boyunca seviye +{Balance.LevelBonus}.");
             StateChanged?.Invoke();
         }
 
@@ -180,10 +197,24 @@ namespace Game.Core
         {
             if (!Economy.TrySpend(ColaPrice)) return;
             RefillEnergy();
+            LevelBuff.Activate(Balance.BoostSeconds);
             Boost.Activate(Balance.BoostSeconds);
-            ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye: vuruşların ×{Balance.BoostPowerMultiplier}, kimse yorulmuyor!");
+            ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye: seviye +{Balance.LevelBonus}, herkes hızlı ve yorulmuyor!");
             if (FocusSite != null) Popup("COŞKU!", FocusSite.transform.position + Vector3.up * 5f, colaColor, 1.8f);
             StateChanged?.Invoke();
+        }
+
+        // Pushes the current cola effects to every character; also called when a new worker is hired.
+        void OnBuffsChanged()
+        {
+            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);
+            StateChanged?.Invoke();
+        }
+
+        void ApplyEffectsTo(Character character)
+        {
+            character.ApplyStamina(Stamina.Level);
+            character.SetBuffs(LevelBuff.IsActive, Boost.IsActive ? Balance.BoostSpeedMultiplier : 1f);
         }
 
         void RefillEnergy()

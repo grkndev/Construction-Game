@@ -233,9 +233,15 @@ namespace Game.Editor
             // and at impact (handle ~horizontal) the head stands upright instead of lying flat.
             Prim.Cube(pivot, "Head", new Vector3(0f, 0.9f, 0f), new Vector3(0.28f, 0.3f, 0.58f), p.hammerHead);
 
+            // Golden ring that shows while the cola level bonus is active (hidden by default).
+            var aura = Prim.Cylinder(root.transform, "Aura", new Vector3(0f, 0.03f, 0f), new Vector3(1.5f, 0.015f, 1.5f), p.marker);
+            Prim.Cube(aura.transform, "Notch", new Vector3(0f, 0f, 0.5f), new Vector3(0.18f, 2.2f, 0.12f), p.flag);   // makes the spin visible
+            aura.SetActive(false);
+
             var visual = root.AddComponent<WorkerVisual>();
             EditorWire.Set(visual, "body", body);
             EditorWire.Set(visual, "hammerPivot", pivot);
+            EditorWire.Set(visual, "aura", aura.transform);
 
             // Energy bar above the head (hidden while full); the Character component drives it.
             var bar = MeterBar.Create(root.transform, "EnergyBar", new Vector3(0f, 2.3f, 0f), 1.0f, 0.16f,

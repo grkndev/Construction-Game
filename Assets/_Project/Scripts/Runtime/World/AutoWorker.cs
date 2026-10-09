@@ -53,7 +53,7 @@ namespace Game.World
 
             if (to.magnitude > 0.2f)
             {
-                transform.position += to.normalized * Mathf.Min(Speed * Time.deltaTime, to.magnitude);
+                transform.position += to.normalized * Mathf.Min(Speed * character.SpeedMultiplier * Time.deltaTime, to.magnitude);
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(to), 12f * Time.deltaTime);
                 visual.SetMove(1f);
                 return;
@@ -65,11 +65,11 @@ namespace Game.World
             if (look.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(look), 10f * Time.deltaTime);
 
-            timer += Time.deltaTime;
+            timer += Time.deltaTime * character.SpeedMultiplier;
             if (timer < Balance.WorkerHitInterval) return;
 
             var point = Vector3.Lerp(transform.position, site.transform.position, 0.55f) + Vector3.up * 1.2f;
-            var result = game.TryHit(site, Balance.WorkerPower(game.Hammer.Level), point, character);
+            var result = game.TryHit(site, Balance.WorkerPower(game.EffectiveLevel), point, character);
             if (result == HitResult.Hit)
             {
                 timer = 0f;

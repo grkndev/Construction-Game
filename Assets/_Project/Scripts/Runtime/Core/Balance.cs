@@ -9,16 +9,16 @@ namespace Game.Core
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 
-        // Tuned with tools/balance_sim.py (energy included, greedy upgrade buying, ~5.5 hits/s when allowed,
-        // a free cola every ~45 s): buildings finish at roughly 0.2 / 0.7 / 1.9 / 4.1 / 8.3 minutes for an
-        // attentive player. Real play is slower than the model, so expect 10-12 minutes in total.
+        // Tuned with tools/balance_sim.py (energy, stamina upgrades and the cola level bonus included, greedy upgrade
+        // buying, ~5.5 hits/s when allowed, a free cola every ~45 s): an attentive player finishes the buildings at
+        // roughly 0.3 / 0.8 / 1.9 / 4.0 / 8.0 minutes. Real play is slower than the model: expect 10-12 minutes.
         public static readonly BuildPlan[] Plans =
         {
-            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 30,   completionBonus: 37),
-            new BuildPlan("Ev",        floors: 3,  workPerFloor: 125,  completionBonus: 150),
-            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 350,  completionBonus: 550),
-            new BuildPlan("Otel",      floors: 7,  workPerFloor: 850,  completionBonus: 2000),
-            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 2100, completionBonus: 7500),
+            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 42,   completionBonus: 52),
+            new BuildPlan("Ev",        floors: 3,  workPerFloor: 175,  completionBonus: 210),
+            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 490,  completionBonus: 770),
+            new BuildPlan("Otel",      floors: 7,  workPerFloor: 1190, completionBonus: 2800),
+            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 2940, completionBonus: 10500),
         };
 
         // ---- Energy: every character (the player and each hired worker) has their own bar. A hit costs energy,
@@ -29,9 +29,24 @@ namespace Game.Core
         public static readonly EnergySettings WorkerEnergy = new EnergySettings(
             max: 100f, cost: 8f, fullRegen: 12f, restDelay: 1.0f, activeRegen: 0f, resumeFraction: 0.4f);
 
+        // ---- Stamina upgrade: every level makes ALL characters' bars bigger and faster to refill.
+        public const int MaxStaminaLevel = 10;
+        const float StaminaMaxPerLevel = 0.15f;
+        const float StaminaRegenPerLevel = 0.10f;
+
+        public static UpgradeTrack NewStaminaTrack() => new UpgradeTrack(baseCost: 60, growth: 1.6, maxLevel: MaxStaminaLevel);
+
+        public static EnergySettings WithStamina(EnergySettings s, int level) => new EnergySettings(
+            s.Max * (1f + StaminaMaxPerLevel * level), s.Cost, s.FullRegen * (1f + StaminaRegenPerLevel * level),
+            s.RestDelay, s.ActiveRegen, s.ResumeFraction);
+
         // ---- Sarı Kola
-        public const float BoostSeconds = 15f;           // "Coşku": bought cola only
-        public const int BoostPowerMultiplier = 2;       // player hits deal double and nothing costs energy while boosted
+        // Any cola gives everyone a temporary level bonus (hit power is computed as if the hammer were +5 levels).
+        // The bought one is the "Coşku": same bonus for longer, plus faster movement/hitting and free energy for everybody.
+        public const int LevelBonus = 5;
+        public const float ColaLevelSeconds = 10f;       // found cola
+        public const float BoostSeconds = 15f;           // bought cola (Coşku)
+        public const float BoostSpeedMultiplier = 1.5f;
         public const int MaxColaInventory = 3;
         public const int MaxColaOnMap = 2;
         public const float ColaFirstSpawn = 8f;

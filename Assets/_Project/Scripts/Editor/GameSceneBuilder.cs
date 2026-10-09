@@ -354,9 +354,10 @@ namespace Game.Editor
             var boostText = Label(root, "Boost", font, outlineMat, 60, new Color(1f, 0.6f, 0.15f), TextAlignmentOptions.Center,
                 new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(900f, 80f));
 
-            var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-470f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
-            var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(0f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
-            var colaBuyButton = UpgradeButton(root, "ColaBuyButton", rounded, font, new Vector2(470f, 50f), new Color(1f, 0.55f, 0.3f), out var colaBuyLabel);
+            var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-645f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
+            var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(-215f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            var staminaButton = UpgradeButton(root, "StaminaButton", rounded, font, new Vector2(215f, 50f), new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
+            var colaBuyButton = UpgradeButton(root, "ColaBuyButton", rounded, font, new Vector2(645f, 50f), new Color(1f, 0.55f, 0.3f), out var colaBuyLabel);
 
             var hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "coinsText", coinsText);
@@ -368,6 +369,8 @@ namespace Game.Editor
             EditorWire.Set(hud, "hammerLabel", hammerLabel);
             EditorWire.Set(hud, "workerButton", workerButton);
             EditorWire.Set(hud, "workerLabel", workerLabel);
+            EditorWire.Set(hud, "staminaButton", staminaButton);
+            EditorWire.Set(hud, "staminaLabel", staminaLabel);
             EditorWire.Set(hud, "colaBuyButton", colaBuyButton);
             EditorWire.Set(hud, "colaBuyLabel", colaBuyLabel);
             EditorWire.Set(hud, "colaUseButton", colaUseButton);
@@ -429,7 +432,7 @@ namespace Game.Editor
 
         static Button UpgradeButton(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Vector2 pos, Color tint, out TMP_Text label)
         {
-            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 0f), pos, new Vector2(440f, 140f), tint, 32, out label);
+            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 0f), pos, new Vector2(410f, 140f), tint, 30, out label);
             label.textWrappingMode = TextWrappingModes.Normal;
             return button;
         }

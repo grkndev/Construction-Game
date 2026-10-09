@@ -12,10 +12,12 @@ namespace Game.World
 
         [SerializeField] Transform body;
         [SerializeField] Transform hammerPivot;
+        [SerializeField] Transform aura;     // spinning ring at the feet while the cola level bonus is active
 
         float move;
         float tired;        // 0..1 smoothed
         bool isTired;
+        bool isBuffed;
         float swingTime = -1f;
         Vector3 bodyBasePos;
 
@@ -29,6 +31,9 @@ namespace Game.World
         /// <summary>Slumps forward and pants while the player's energy is exhausted.</summary>
         public void SetTired(bool value) => isTired = value;
 
+        /// <summary>Shows the golden ring while the temporary level bonus is on.</summary>
+        public void SetBuffed(bool value) => isBuffed = value;
+
         void Update()
         {
             var bob = Mathf.Abs(Mathf.Sin(Time.time * 11f)) * 0.1f * move;
@@ -39,6 +44,12 @@ namespace Game.World
             tired = Mathf.MoveTowards(tired, isTired ? 1f : 0f, 4f * Time.deltaTime);
             var pant = Mathf.Sin(Time.time * 14f) * 2f * tired;
             body.localRotation = Quaternion.Euler(tired * 18f + pant, 0f, 0f);
+
+            if (aura != null)
+            {
+                if (aura.gameObject.activeSelf != isBuffed) aura.gameObject.SetActive(isBuffed);
+                if (isBuffed) aura.Rotate(0f, 240f * Time.deltaTime, 0f, Space.Self);
+            }
 
             // Resting pose holds the hammer up; a swing goes up-back then slams down.
             var angle = -35f;

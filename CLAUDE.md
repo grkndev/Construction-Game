@@ -11,8 +11,8 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Her vuruş = ilerleme + o kadar para. Bina kat kat yükselir, bitince bonus ve konfeti. Sıradaki plot açılır.
 - 5 plotun hepsi baştan açık; oyuncu menzildeki en yakın plota vurur, işçiler en az işçisi olan plota dağılır.
 - **Enerji:** her karakterin (oyuncu ve her işçi) kendi enerjisi var, kafasının üstündeki barda görünür (oyuncununki ayrıca HUD'da). Vuruş enerji harcar, durunca dolar; bitince %40'a dolana kadar o karakter bekler. Plotların enerjisi yok. Bunun kodu `World/Character.cs` (yeni karakter türü = bu bileşeni eklemek).
-- **Sarı Kola:** adada rastgele belirir, üstünden geçince cebe girer (en çok 3), **E / gamepad X** ile içilir → **tüm karakterlerin** enerjisi dolar. Parayla alınan kola hemen içilir ve ayrıca 15 sn **Coşku** verir (oyuncunun vuruşları ×2, kimse enerji harcamaz).
-- Parayla: **Çekiç** (vuruş gücü), **İşçi** (otomatik çalışan yardımcı, en çok 8) ve **Sarı Kola**.
+- **Sarı Kola:** adada rastgele belirir, üstünden geçince cebe girer (en çok 3), **E / gamepad X** ile içilir → **tüm karakterlerin** enerjisi dolar ve 10 sn boyunca vuruş gücü "seviye +5" gibi hesaplanır (ayaklarında altın halka). Parayla alınan kola hemen içilir ve 15 sn **Coşku** verir: aynı +5 seviye, ayrıca herkes ×1.5 hızlı yürür/vurur ve kimse enerji harcamaz.
+- Parayla: **Çekiç** (vuruş gücü), **İşçi** (otomatik çalışan yardımcı, en çok 8), **Dayanıklılık** (tüm karakterlerin enerji kapasitesi +%15 ve yenilenme +%10 / seviye, en çok 10) ve **Sarı Kola**.
 - 5 bina bitince "Şehir tamamlandı" görünür.
 
 ## Görsel stil

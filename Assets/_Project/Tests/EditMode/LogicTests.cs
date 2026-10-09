@@ -254,6 +254,16 @@ namespace Game.Tests
         }
 
         [Test]
+        public void Reconfigure_KeepsTheFillFraction_NotTheAbsoluteValue()
+        {
+            var m = Meter();
+            m.TrySpend();                       // 8 / 10 = 80%
+            m.Reconfigure(new EnergySettings(20f, 2f, 4f, 1f, 0f, 0.5f));
+            Assert.AreEqual(0.8f, m.Fraction, 1e-4);
+            Assert.AreEqual(16f, m.Value, 1e-4);
+        }
+
+        [Test]
         public void NeverExceedsMax()
         {
             var m = Meter();
@@ -284,6 +294,52 @@ namespace Game.Tests
             b.Activate(10f);
             b.Activate(3f);
             Assert.AreEqual(10f, b.Remaining);
+        }
+    }
+
+    public class StaminaBalanceTests
+    {
+        [Test]
+        public void EachLevel_GivesBiggerBarAndFasterRegen_WithoutChangingCosts()
+        {
+            var baseSettings = Balance.WorkerEnergy;
+            var l5 = Balance.WithStamina(baseSettings, 5);
+            Assert.AreEqual(baseSettings.Max * 1.75f, l5.Max, 1e-3);
+            Assert.AreEqual(baseSettings.FullRegen * 1.5f, l5.FullRegen, 1e-3);
+            Assert.AreEqual(baseSettings.Cost, l5.Cost);
+            Assert.AreEqual(baseSettings.ResumeFraction, l5.ResumeFraction);
+        }
+
+        [Test]
+        public void MoreStamina_MeansMoreHitsPerBar()
+        {
+            int Hits(int level)
+            {
+                var m = new EnergyMeter(Balance.WithStamina(Balance.PlayerEnergy, level));
+                var n = 0;
+                while (m.TrySpend()) n++;
+                return n;
+            }
+            Assert.Greater(Hits(5), Hits(0));
+            Assert.Greater(Hits(10), Hits(5));
+        }
+
+        [Test]
+        public void StaminaTrack_StopsAtItsMaxLevel()
+        {
+            var t = Balance.NewStaminaTrack();
+            var e = new Economy();
+            e.Add(1_000_000);
+            for (var i = 0; i < Balance.MaxStaminaLevel; i++) Assert.IsTrue(t.TryBuy(e));
+            Assert.IsFalse(t.TryBuy(e));
+        }
+
+        [Test]
+        public void ColaLevelBonus_IsSizeableButNotTheWholeGame()
+        {
+            // +5 levels must be felt on a young hammer yet stay a bonus (not larger than the max hammer level).
+            Assert.That(Balance.LevelBonus, Is.InRange(3, 8));
+            Assert.Greater(Balance.BoostSeconds, Balance.ColaLevelSeconds, "a bought cola should last longer than a found one");
         }
     }
 

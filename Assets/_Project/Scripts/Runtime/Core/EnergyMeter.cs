@@ -30,7 +30,7 @@ namespace Game.Core
     /// </summary>
     public sealed class EnergyMeter
     {
-        readonly EnergySettings settings;
+        EnergySettings settings;
         float sinceSpent;
 
         public float Value { get; private set; }
@@ -64,6 +64,17 @@ namespace Game.Core
             var acting = deltaTime - resting;
             Value = Math.Min(settings.Max, Value + settings.FullRegen * resting + settings.ActiveRegen * acting);
             if (IsExhausted && Value >= settings.ResumeFraction * settings.Max) IsExhausted = false;
+        }
+
+        /// <summary>
+        /// Swap the tuning (stamina upgrades change max and regen). The fill fraction is kept, so buying
+        /// an upgrade never doubles as a free refill.
+        /// </summary>
+        public void Reconfigure(EnergySettings newSettings)
+        {
+            var fraction = Fraction;
+            settings = newSettings;
+            Value = fraction * settings.Max;
         }
 
         public void Refill()

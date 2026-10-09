@@ -17,6 +17,8 @@ namespace Game.UI
         [SerializeField] TMP_Text hammerLabel;
         [SerializeField] Button workerButton;
         [SerializeField] TMP_Text workerLabel;
+        [SerializeField] Button staminaButton;
+        [SerializeField] TMP_Text staminaLabel;
         [SerializeField] Button colaBuyButton;
         [SerializeField] TMP_Text colaBuyLabel;
         [SerializeField] Button colaUseButton;
@@ -37,11 +39,13 @@ namespace Game.UI
             game.Economy.Changed += Refresh;
             game.Hammer.Changed += Refresh;
             game.Workers.Changed += Refresh;
+            game.Stamina.Changed += Refresh;
             game.StateChanged += Refresh;
             game.Hint += ShowHint;
 
             hammerButton.onClick.AddListener(game.BuyHammer);
             workerButton.onClick.AddListener(game.BuyWorker);
+            staminaButton.onClick.AddListener(game.BuyStamina);
             colaBuyButton.onClick.AddListener(game.BuyCola);
             colaUseButton.onClick.AddListener(game.UseCola);
             victoryText.gameObject.SetActive(false);
@@ -56,6 +60,7 @@ namespace Game.UI
             game.Economy.Changed -= Refresh;
             game.Hammer.Changed -= Refresh;
             game.Workers.Changed -= Refresh;
+            game.Stamina.Changed -= Refresh;
             game.StateChanged -= Refresh;
             game.Hint -= ShowHint;
         }
@@ -83,8 +88,10 @@ namespace Game.UI
 
             var focus = game.FocusSite;
 
-            boostText.gameObject.SetActive(game.Boost.IsActive);
-            if (game.Boost.IsActive) boostText.text = $"COŞKU!  {game.Boost.Remaining:0.0}s";
+            var buffed = game.Boost.IsActive || game.LevelBuff.IsActive;
+            boostText.gameObject.SetActive(buffed);
+            if (game.Boost.IsActive) boostText.text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";
+            else if (game.LevelBuff.IsActive) boostText.text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
 
             if (game.AllDone) return;
             buildingText.text = focus != null
@@ -105,13 +112,18 @@ namespace Game.UI
 
             hammerLabel.text = game.Hammer.IsMaxed
                 ? "ÇEKİÇ\nEn yüksek seviye"
-                : $"ÇEKİÇ  Sv.{game.Hammer.Level + 1}\nVuruş {game.HammerPower} (+1)  •  {NumberFormat.Compact(game.Hammer.NextCost)}";
+                : $"ÇEKİÇ  Sv.{game.Hammer.Level + 1}\nVuruş {game.BaseHammerPower} (+1)  •  {NumberFormat.Compact(game.Hammer.NextCost)}";
             hammerButton.interactable = !game.Hammer.IsMaxed && game.Economy.CanAfford(game.Hammer.NextCost);
 
             workerLabel.text = game.Workers.IsMaxed
                 ? $"İŞÇİ  {game.Workers.Level}\nEkip tamam"
                 : $"İŞÇİ AL  ({game.Workers.Level}/{Balance.MaxWorkers})\n{NumberFormat.Compact(game.Workers.NextCost)}";
             workerButton.interactable = !game.Workers.IsMaxed && game.Economy.CanAfford(game.Workers.NextCost);
+
+            staminaLabel.text = game.Stamina.IsMaxed
+                ? $"DAYANIKLILIK\nEn yüksek seviye"
+                : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\nEnerji +%15  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
+            staminaButton.interactable = !game.Stamina.IsMaxed && game.Economy.CanAfford(game.Stamina.NextCost);
 
             colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
             colaBuyButton.interactable = game.Economy.CanAfford(game.ColaPrice);

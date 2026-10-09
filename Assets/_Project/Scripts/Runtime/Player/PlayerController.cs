@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Game.Player
 {
     /// <summary>Camera-relative walking on a CharacterController, kept inside the island.</summary>
-    [RequireComponent(typeof(CharacterController), typeof(GameInput))]
+    [RequireComponent(typeof(CharacterController), typeof(GameInput), typeof(Character))]
     public sealed class PlayerController : MonoBehaviour
     {
         [SerializeField] float speed = 5.5f;
@@ -14,12 +14,14 @@ namespace Game.Player
 
         CharacterController controller;
         GameInput input;
+        Character character;
         Transform cam;
 
         void Awake()
         {
             controller = GetComponent<CharacterController>();
             input = GetComponent<GameInput>();
+            character = GetComponent<Character>();
         }
 
         void Update()
@@ -34,7 +36,7 @@ namespace Game.Player
             var direction = forward * stick.y + right * stick.x;
 
             // Small constant downward push keeps the controller grounded on the flat island.
-            controller.Move((direction * speed + Vector3.down * 2f) * Time.deltaTime);
+            controller.Move((direction * (speed * character.SpeedMultiplier) + Vector3.down * 2f) * Time.deltaTime);
 
             var flat = new Vector3(transform.position.x, 0f, transform.position.z);
             if (flat.magnitude > islandRadius)

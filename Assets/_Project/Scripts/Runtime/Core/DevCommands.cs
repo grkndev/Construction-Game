@@ -46,8 +46,17 @@ namespace Game.Core
         {
             // Pretend to be a fast player: ~8 hits per second, upgrades bought whenever affordable, colas drunk when found.
             var wait = new WaitForSeconds(0.12f);
+            var elapsed = 0f;
+            var boosted = false;
             while (!game.AllDone)
             {
+                elapsed += 0.12f;
+                if (!boosted && elapsed > 20f)   // exercise the bought-cola path once so its effects show up in screenshots
+                {
+                    boosted = true;
+                    game.Economy.Add(game.ColaPrice);
+                    game.BuyCola();
+                }
                 // Like a sensible player: finish the smallest unfinished plot.
                 Game.World.BuildSite site = null;
                 foreach (var candidate in game.Sites)
@@ -58,6 +67,7 @@ namespace Game.Core
                 if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up, player);
                 game.BuyWorker();
                 game.BuyHammer();
+                game.BuyStamina();
                 game.UseCola();
                 yield return wait;
             }
