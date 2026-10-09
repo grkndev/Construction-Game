@@ -14,7 +14,6 @@ namespace Game.World
         [SerializeField] GameController game;
         [SerializeField] Transform player;
         [SerializeField] ToonPalette palette;
-        [SerializeField] float islandRadius = 12f;
 
         readonly List<ColaPickup> alive = new List<ColaPickup>();
         float timer;
@@ -67,7 +66,7 @@ namespace Game.World
             for (var attempt = 0; attempt < 30; attempt++)
             {
                 var angle = Random.value * Mathf.PI * 2f;
-                var radius = Mathf.Sqrt(Random.Range(0.1f, 1f)) * islandRadius;
+                var radius = Mathf.Sqrt(Random.Range(0.1f, 1f)) * game.CurrentDistrict.WalkRadius * 0.9f;
                 var point = game.CurrentDistrict.Center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
                 if (!IsFree(point)) continue;
 

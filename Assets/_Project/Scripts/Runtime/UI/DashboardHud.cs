@@ -11,7 +11,7 @@ namespace Game.UI
     /// </summary>
     public sealed class DashboardHud : MonoBehaviour
     {
-        const float CardHeightAboveGround = 11f;   // cards float above the district so they do not hide its buildings
+        const float CardHeightAboveGround = 16f;   // cards float above the district so they do not hide its buildings
 
         [SerializeField] GameObject root;
         [SerializeField] DistrictCard[] cards;

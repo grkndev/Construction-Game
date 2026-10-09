@@ -29,7 +29,7 @@ namespace Game.Core
         [SerializeField] IsoCameraFollow cameraRig;
         [SerializeField] Transform overviewTarget;
         [SerializeField] ToonPalette palette;
-        [SerializeField] float overviewScale = 3.7f;
+        [SerializeField] float overviewScale = 6.3f;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
         [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);

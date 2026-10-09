@@ -21,8 +21,12 @@ namespace Game.Editor
     {
         public const string ScenePath = "Assets/_Project/Scenes/Main.unity";
         const string ParticleMatPath = "Assets/_Project/Art/Materials/Particle.mat";
+        // Layout numbers below were first drawn for a district of radius 14; Grow stretches every distance inside a district so
+        // the player has room to walk between the plots (buildings and props keep their size).
+        const float Grow = 1.6f;
         const float PlotRing = 6.8f;
-        const float DistrictRing = 24f;   // distance of each district from the island centre (they touch around a small lake)
+        const float DistrictRadius = 14f * Grow;
+        const float DistrictRing = DistrictRadius / 0.5878f;   // distance of each district from the island centre: neighbours touch (sin 36 deg), a lake stays in the middle
 
         public static void Ensure()
         {
@@ -113,27 +117,36 @@ namespace Game.Editor
             root.transform.position = PolarPoint(DistrictRing, outward);
             var t = root.transform;
 
-            Prim.Cylinder(t, "IslandBase", new Vector3(0f, -1.5f, 0f), new Vector3(26f, 1f, 26f), p.dirt);
-            Prim.Cylinder(t, "IslandTop", new Vector3(0f, -0.25f, 0f), new Vector3(28f, 0.25f, 28f), p.districtGround[index]);
+            Prim.Cylinder(t, "IslandBase", new Vector3(0f, -1.5f, 0f), new Vector3(26f * Grow, 1f, 26f * Grow), p.dirt);
+            Prim.Cylinder(t, "IslandTop", new Vector3(0f, -0.25f, 0f), new Vector3(28f * Grow, 0.25f, 28f * Grow), p.districtGround[index]);
             var ground = new GameObject("GroundCollider");
             ground.transform.SetParent(t, false);
             ground.transform.localPosition = new Vector3(0f, -0.5f, 0f);
-            ground.AddComponent<BoxCollider>().size = new Vector3(30f, 1f, 30f);
+            ground.AddComponent<BoxCollider>().size = new Vector3(30f * Grow, 1f, 30f * Grow);
 
             // Scenery on the rim, away from the plots and the centre; rotated per district so no two look alike.
             var turn = index * 37f;
-            var treeAngles = new[] { 10f, 38f, 100f, 165f, 205f, 255f, 300f, 335f };
+            var treeAngles = new[] { 10f, 28f, 38f, 62f, 100f, 128f, 150f, 165f, 190f, 205f, 232f, 255f, 280f, 300f, 318f, 335f, 352f };
             for (var i = 0; i < treeAngles.Length; i++)
-                BuildTree(t, PolarPoint(11.2f + (i % 3) * 0.9f, treeAngles[i] + turn), 0.9f + (i % 3) * 0.15f, p);
+                BuildTree(t, Local(11.2f + (i % 3) * 0.9f, treeAngles[i] + turn), 0.9f + (i % 3) * 0.15f, p);
 
-            foreach (var spot in new[] { PolarPoint(10.2f, 62f + turn), PolarPoint(9.8f, 228f + turn) })
+            // A few trees and rocks out in the open between the plots so the middle of the district is not bare.
+            for (var i = 0; i < 6; i++)
+            {
+                var angle = 30f + i * 60f + turn;   // plots sit at 90/210/330, so 30/150/270 are the gaps
+                var spot = Local(i % 2 == 0 ? 8.6f : 6.4f, angle + (i % 2 == 0 ? 0f : 17f));
+                if (i % 2 == 0) BuildTree(t, spot, 0.8f, p);
+                else Prim.Sphere(t, "Rock", spot + Vector3.up * 0.15f, new Vector3(1.0f, 0.6f, 0.8f), p.stone).transform.Rotate(0f, angle, 0f);
+            }
+
+            foreach (var spot in new[] { Local(10.2f, 62f + turn), Local(9.8f, 228f + turn) })
             {
                 Prim.Cube(t, "Crate", spot + Vector3.up * 0.45f, Vector3.one * 0.9f, p.crate, true);
                 Prim.Cube(t, "Crate", spot + new Vector3(0.9f, 0.45f, 0.3f), Vector3.one * 0.9f, p.crate, true).transform.Rotate(0f, 20f, 0f);
                 Prim.Cube(t, "Crate", spot + new Vector3(0.3f, 1.35f, 0.1f), Vector3.one * 0.9f, p.crate).transform.Rotate(0f, 10f, 0f);
             }
 
-            foreach (var spot in new[] { PolarPoint(4.2f, 0f + turn), PolarPoint(4.4f, 140f + turn), PolarPoint(3.9f, 320f + turn) })
+            foreach (var spot in new[] { Local(4.2f, 0f + turn), Local(4.4f, 140f + turn), Local(3.9f, 320f + turn), Local(5.5f, 80f + turn), Local(5.2f, 250f + turn) })
             {
                 Prim.Cylinder(t, "ConeBase", spot + Vector3.up * 0.04f, new Vector3(0.55f, 0.04f, 0.55f), p.cone);
                 Prim.Cylinder(t, "ConeBody", spot + Vector3.up * 0.35f, new Vector3(0.3f, 0.3f, 0.3f), p.cone, true);
@@ -141,13 +154,13 @@ namespace Game.Editor
             }
 
             foreach (var angle in new[] { 80f, 190f, 310f })
-                Prim.Sphere(t, "Rock", PolarPoint(12.3f, angle + turn) + Vector3.up * 0.15f, new Vector3(1.2f, 0.7f, 0.9f), p.stone).transform.Rotate(0f, angle, 0f);
+                Prim.Sphere(t, "Rock", Local(12.3f, angle + turn) + Vector3.up * 0.15f, new Vector3(1.2f, 0.7f, 0.9f), p.stone).transform.Rotate(0f, angle, 0f);
 
             BuildLandmark(index, t, p);
 
             var sites = new BuildSite[def.Plans.Length];
             for (var n = 0; n < sites.Length; n++)
-                sites[n] = BuildPlot(t, n, def.Plans[n], PolarPoint(PlotRing, 90f + n * 120f), p, font, outlineMat);
+                sites[n] = BuildPlot(t, n, def.Plans[n], Local(PlotRing, 90f + n * 120f), p, font, outlineMat);
 
             var playerSpawn = new GameObject("PlayerSpawn").transform;
             playerSpawn.SetParent(t, false);
@@ -159,6 +172,7 @@ namespace Game.Editor
             EditorWire.SetArray(district, "sites", sites);
             EditorWire.Set(district, "playerSpawn", playerSpawn);
             EditorWire.Set(district, "workerSpawn", workerSpawn);
+            EditorWire.SetFloat(district, "walkRadius", DistrictRadius - 1f);
             return district;
         }
 
@@ -168,7 +182,7 @@ namespace Game.Editor
             var outward = 90f - index * 72f;
             var world = new GameObject("Landmark").transform;
             world.SetParent(t, false);
-            world.localPosition = PolarPoint(11.5f, outward);
+            world.localPosition = Local(11.5f, outward);
             world.localRotation = Quaternion.Euler(0f, -outward, 0f);   // local +x points away from the island centre
 
             switch (index)
@@ -223,6 +237,9 @@ namespace Game.Editor
             Prim.Sphere(tree, "LeavesLow", new Vector3(0f, 1.9f, 0f), Vector3.one * 2.3f, p.leaves);
             Prim.Sphere(tree, "LeavesHigh", new Vector3(0.1f, 2.9f, 0.05f), Vector3.one * 1.6f, p.leaves);
         }
+
+        // A point inside a district, in first-draft units (see Grow).
+        static Vector3 Local(float radius, float degrees) => PolarPoint(radius * Grow, degrees);
 
         static Vector3 PolarPoint(float radius, float degrees)
         {
