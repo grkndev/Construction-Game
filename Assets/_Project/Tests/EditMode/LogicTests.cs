@@ -297,6 +297,21 @@ namespace Game.Tests
         }
 
         [Test]
+        public void WorkerBurst_IsShorterThanThePlayersAndRestsBeforeResuming()
+        {
+            // One bar of energy: a worker gets about a dozen hits, then must stand still until 40% is back.
+            var m = new EnergyMeter(Balance.WorkerEnergy);
+            var hits = 0;
+            while (m.TrySpend()) hits++;
+            Assert.That(hits, Is.InRange(8, 16));
+            Assert.IsTrue(m.IsExhausted);
+
+            var seconds = 0f;
+            while (m.IsExhausted && seconds < 30f) { m.Tick(0.1f); seconds += 0.1f; }
+            Assert.That(seconds, Is.InRange(2f, 8f), "a rest should be noticeable but not a long wait");
+        }
+
+        [Test]
         public void PlayerCanHitAFewTimesBeforeTiring()
         {
             // Sanity for the feel: a full bar must allow a decent burst, but not an endless one.

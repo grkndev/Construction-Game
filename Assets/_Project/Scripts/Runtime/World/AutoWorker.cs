@@ -11,6 +11,7 @@ namespace Game.World
         [SerializeField] WorkerVisual visual;
 
         GameController game;
+        Character character;
         BuildSite site;
         int slot;
         float timer;
@@ -18,6 +19,7 @@ namespace Game.World
         public void Initialize(GameController owner)
         {
             game = owner;
+            character = GetComponent<Character>();
             timer = Random.value * Balance.WorkerHitInterval;   // desynchronise helpers so hits don't stack up
         }
 
@@ -25,6 +27,13 @@ namespace Game.World
 
         void Update()
         {
+            // Out of energy: stand and catch your breath (the Character component refills it over time).
+            if (character.Energy.IsExhausted)
+            {
+                visual.SetMove(0f);
+                return;
+            }
+
             // Pick (or re-pick after the plot is finished) the unfinished plot with the fewest helpers.
             if (site == null || site.IsComplete)
             {
@@ -60,7 +69,7 @@ namespace Game.World
             if (timer < Balance.WorkerHitInterval) return;
 
             var point = Vector3.Lerp(transform.position, site.transform.position, 0.55f) + Vector3.up * 1.2f;
-            var result = game.TryHit(site, Balance.WorkerPower(game.Hammer.Level), point, byPlayer: false);
+            var result = game.TryHit(site, Balance.WorkerPower(game.Hammer.Level), point, character);
             if (result == HitResult.Hit)
             {
                 timer = 0f;
@@ -68,7 +77,7 @@ namespace Game.World
             }
             else
             {
-                timer = Balance.WorkerHitInterval - 0.3f;   // plot is resting: check back soon instead of waiting a full interval
+                timer = Balance.WorkerHitInterval - 0.3f;   // couldn't hit (tired or plot finished): check back soon
             }
         }
     }

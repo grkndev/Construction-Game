@@ -23,9 +23,6 @@ namespace Game.UI
         [SerializeField] TMP_Text colaUseLabel;
         [SerializeField] RectTransform playerEnergyFill;
         [SerializeField] Image playerEnergyImage;
-        [SerializeField] RectTransform siteEnergyFill;
-        [SerializeField] Image siteEnergyImage;
-        [SerializeField] TMP_Text siteEnergyLabel;
 
         static readonly Color Good = new Color(0.36f, 0.89f, 0.49f);
         static readonly Color Warn = new Color(1f, 0.82f, 0.25f);
@@ -82,19 +79,9 @@ namespace Game.UI
             }
 
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
-            SetBar(playerEnergyFill, playerEnergyImage, game.PlayerEnergy.Fraction, game.PlayerEnergy.IsExhausted && !game.Boost.IsActive);
+            SetBar(playerEnergyFill, playerEnergyImage, game.PlayerEnergy.Fraction, game.PlayerEnergy.IsExhausted);
 
             var focus = game.FocusSite;
-            if (focus != null)
-            {
-                siteEnergyLabel.text = focus.Energy.IsExhausted ? "Şantiye dinleniyor" : "Şantiye";
-                SetBar(siteEnergyFill, siteEnergyImage, focus.Energy.Fraction, focus.Energy.IsExhausted);
-            }
-            else
-            {
-                siteEnergyLabel.text = "Şantiye";
-                SetBar(siteEnergyFill, siteEnergyImage, 0f, false);
-            }
 
             boostText.gameObject.SetActive(game.Boost.IsActive);
             if (game.Boost.IsActive) boostText.text = $"COŞKU!  {game.Boost.Remaining:0.0}s";

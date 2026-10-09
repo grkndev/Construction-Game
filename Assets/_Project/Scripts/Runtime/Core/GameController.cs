@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Game.Core
 {
-    public enum HitResult { Hit, NoTarget, PlayerTired, SiteTired }
+    public enum HitResult { Hit, NoTarget, Tired }
 
     /// <summary>
     /// Scene-level composition root: owns the economy, upgrades, energy and boost state (plain C# objects),
@@ -21,6 +21,7 @@ namespace Game.Core
         [SerializeField] Transform workerSpawn;
         [SerializeField] FloatingText floatingTextPrefab;
         [SerializeField] GameHud hud;
+        [SerializeField] Character player;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
         [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);
@@ -28,7 +29,7 @@ namespace Game.Core
         public Economy Economy { get; } = new Economy();
         public UpgradeTrack Hammer { get; } = Balance.NewHammerTrack();
         public UpgradeTrack Workers { get; } = Balance.NewWorkerTrack();
-        public EnergyMeter PlayerEnergy { get; } = new EnergyMeter(Balance.PlayerEnergy);
+        public EnergyMeter PlayerEnergy => player.Energy;
         public BoostTimer Boost { get; } = new BoostTimer();
         public int ColaCount { get; private set; }
         public long ColaPrice => Balance.ColaPrice(Hammer.Level);
@@ -61,7 +62,6 @@ namespace Game.Core
 
         void Update()
         {
-            PlayerEnergy.Tick(Time.deltaTime);
             Boost.Tick(Time.deltaTime);
         }
 
@@ -97,26 +97,21 @@ namespace Game.Core
         }
 
         /// <summary>
-        /// One hammer hit. Needs energy from the plot and, for the player, from the player; a boost (bought cola)
-        /// makes both free and doubles the player's hits. Work equals coins earned.
+        /// One hammer hit by <paramref name="actor"/>. It costs the actor's own energy; a boost (bought cola)
+        /// makes hits free for everyone and doubles the player's. Work equals coins earned.
         /// </summary>
-        public HitResult TryHit(BuildSite site, int power, Vector3 point, bool byPlayer)
+        public HitResult TryHit(BuildSite site, int power, Vector3 point, Character actor)
         {
             if (site == null || site.State != SiteState.Active) return HitResult.NoTarget;
 
             var free = Boost.IsActive;
-            if (!free && byPlayer && !PlayerEnergy.CanSpend) return HitResult.PlayerTired;
-            if (!free && !site.Energy.CanSpend) return HitResult.SiteTired;
+            if (!free && !actor.Energy.CanSpend) return HitResult.Tired;
 
-            if (free && byPlayer) power *= Balance.BoostPowerMultiplier;
+            if (free && actor.IsPlayer) power *= Balance.BoostPowerMultiplier;
             var applied = site.AddWork(power, point);
             if (applied == 0) return HitResult.NoTarget;
 
-            if (!free)
-            {
-                if (byPlayer) PlayerEnergy.TrySpend();
-                site.Energy.TrySpend();
-            }
+            if (!free) actor.Energy.TrySpend();
             Economy.Add(applied);
             Popup($"+{applied}", point, coinColor, 1f);
             return HitResult.Hit;
@@ -170,31 +165,31 @@ namespace Game.Core
             return true;
         }
 
-        /// <summary>Drink a found cola: refills the player and every plot, no boost.</summary>
+        /// <summary>Drink a found cola: refills every character's energy (player and workers), no boost.</summary>
         public void UseCola()
         {
             if (ColaCount <= 0) return;
             ColaCount--;
             RefillEnergy();
-            ShowHint("Sarı Kola! Enerji doldu.");
+            ShowHint("Sarı Kola! Herkesin enerjisi doldu.");
             StateChanged?.Invoke();
         }
 
-        /// <summary>Buy and drink immediately: refills everything and also starts the "Coşku" boost.</summary>
+        /// <summary>Buy and drink immediately: refills every character and also starts the "Coşku" boost.</summary>
         public void BuyCola()
         {
             if (!Economy.TrySpend(ColaPrice)) return;
             RefillEnergy();
             Boost.Activate(Balance.BoostSeconds);
-            ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye boyunca vuruşların ×{Balance.BoostPowerMultiplier} ve yorulmuyorsun!");
+            ShowHint($"COŞKU! {Balance.BoostSeconds:0} saniye: vuruşların ×{Balance.BoostPowerMultiplier}, kimse yorulmuyor!");
             if (FocusSite != null) Popup("COŞKU!", FocusSite.transform.position + Vector3.up * 5f, colaColor, 1.8f);
             StateChanged?.Invoke();
         }
 
         void RefillEnergy()
         {
-            PlayerEnergy.Refill();
-            foreach (var site in sites) site.Energy.Refill();
+            // Found at call time on purpose: workers are hired during play and no registry is needed.
+            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.Refill();
         }
 
         public void ShowHint(string text) => Hint?.Invoke(text);

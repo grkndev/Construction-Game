@@ -190,10 +190,10 @@ namespace Game.Editor
         public static void EnsurePrefabs(ToonPalette palette, TMP_FontAsset font, Material outlineMat, bool force)
         {
             EditorWire.EnsureFolder(PrefabsDir);
-            if (force || !File.Exists(WorkerPrefabPath)) SavePrefab(WorkerPrefabPath, BuildWorker(palette, "Worker", palette.shirt));
+            if (force || !File.Exists(WorkerPrefabPath)) SavePrefab(WorkerPrefabPath, BuildWorker(palette, "Worker", palette.shirt, CharacterKind.Player));
             if (force || !File.Exists(AutoWorkerPrefabPath))
             {
-                var root = BuildWorker(palette, "AutoWorker", palette.shirtHelper);
+                var root = BuildWorker(palette, "AutoWorker", palette.shirtHelper, CharacterKind.Worker);
                 var auto = root.AddComponent<AutoWorker>();
                 EditorWire.Set(auto, "visual", root.GetComponent<WorkerVisual>());
                 SavePrefab(AutoWorkerPrefabPath, root);
@@ -209,7 +209,7 @@ namespace Game.Editor
         }
 
         /// <summary>Cartoon construction worker: capsule body, round head, yellow hard hat, hammer on a pivot.</summary>
-        static GameObject BuildWorker(ToonPalette p, string name, Material shirt)
+        static GameObject BuildWorker(ToonPalette p, string name, Material shirt, CharacterKind kind)
         {
             var root = new GameObject(name);
             root.transform.localScale = Vector3.one * 1.4f;   // chunky proportions read better from the iso camera
@@ -236,6 +236,14 @@ namespace Game.Editor
             var visual = root.AddComponent<WorkerVisual>();
             EditorWire.Set(visual, "body", body);
             EditorWire.Set(visual, "hammerPivot", pivot);
+
+            // Energy bar above the head (hidden while full); the Character component drives it.
+            var bar = MeterBar.Create(root.transform, "EnergyBar", new Vector3(0f, 2.3f, 0f), 1.0f, 0.16f,
+                p.barBack, p.energyFill, p.energyLow, hideWhenFull: true);
+            var character = root.AddComponent<Character>();
+            EditorWire.SetInt(character, "kind", (int)kind);
+            EditorWire.Set(character, "visual", visual);
+            EditorWire.Set(character, "energyBar", bar);
             return root;
         }
 

@@ -37,8 +37,6 @@ namespace Game.World
         Transform roof;
         readonly List<Transform> floors = new List<Transform>();
         float punch;
-        MeterBar energyBar;
-        bool labelShowsRest;
 
         public BuildPlan Plan => plan;
         public SiteState State => state;
@@ -46,8 +44,6 @@ namespace Game.World
         public float Fraction => progress?.Fraction ?? 0f;
         public int FloorsBuilt => progress?.FloorsBuilt ?? 0;
 
-        /// <summary>The plot's own stamina: every hit on it (player or worker) drains it, it refills while left alone.</summary>
-        public EnergyMeter Energy { get; } = new EnergyMeter(Balance.SiteEnergy);
         public event Action<BuildSite> Completed;
 
         /// <summary>How many auto-workers currently work here; the dispatcher sends new ones to the emptiest plot.</summary>
@@ -174,9 +170,6 @@ namespace Game.World
                 label.text = plan.Name;
             }
 
-            energyBar = MeterBar.Create(barRoot, "EnergyBar", new Vector3(0f, -0.36f, 0f), 2.4f, 0.2f,
-                palette.barBack, palette.energyFill, palette.energyLow, hideWhenFull: false);
-
             marker = Prim.Cube(barRoot, "Marker", new Vector3(0f, 1.5f, 0f), new Vector3(0.5f, 0.5f, 0.5f), palette.marker).transform;
             marker.localRotation = Quaternion.Euler(45f, 0f, 45f);
             SetBarFraction(0f);
@@ -246,17 +239,6 @@ namespace Game.World
         void Update()
         {
             if (body == null) return;
-
-            if (state == SiteState.Active)
-            {
-                Energy.Tick(Time.deltaTime);
-                energyBar.Set(Energy.Fraction, Energy.IsExhausted);
-                if (label != null && labelShowsRest != Energy.IsExhausted)
-                {
-                    labelShowsRest = Energy.IsExhausted;
-                    label.text = labelShowsRest ? $"{plan.Name} (dinleniyor)" : plan.Name;
-                }
-            }
 
             // Squash-and-stretch reaction to each hammer hit, around the base of the building.
             punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);

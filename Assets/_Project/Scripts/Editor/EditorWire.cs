@@ -14,6 +14,14 @@ namespace Game.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        public static void SetInt(Object target, string field, int value)
+        {
+            var so = new SerializedObject(target);
+            var prop = so.FindProperty(field) ?? throw new System.ArgumentException($"{target.GetType().Name} has no serialized field '{field}'");
+            prop.intValue = value;   // also covers enums
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static void SetArray(Object target, string field, Object[] values)
         {
             var so = new SerializedObject(target);

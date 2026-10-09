@@ -14,6 +14,7 @@ namespace Game.Core
     public sealed class DevCommands : MonoBehaviour
     {
         [SerializeField] GameController game;
+        [SerializeField] Game.World.Character player;
 
         IEnumerator Start()
         {
@@ -34,7 +35,9 @@ namespace Game.Core
             File.WriteAllBytes(shot, tex.EncodeToPNG());
             var spread = string.Join(",", System.Array.ConvertAll(
                 FindObjectsByType<Game.World.BuildSite>(FindObjectsSortMode.InstanceID), x => $"{x.Plan.Name}:{x.AssignedWorkers}{(x.IsComplete ? "(done)" : "")}"));
-            Debug.Log($"[Dev] workers per plot: {spread}");
+            var resting = 0;
+            foreach (var c in FindObjectsByType<Game.World.Character>(FindObjectsSortMode.None)) if (c.Energy.IsExhausted) resting++;
+            Debug.Log($"[Dev] workers per plot: {spread}; characters resting: {resting}");
             Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, done={game.CompletedCount}/{game.TotalCount}");
             Application.Quit();
         }
@@ -45,14 +48,14 @@ namespace Game.Core
             var wait = new WaitForSeconds(0.12f);
             while (!game.AllDone)
             {
-                // Like a sensible player: finish the smallest plot that isn't resting.
+                // Like a sensible player: finish the smallest unfinished plot.
                 Game.World.BuildSite site = null;
                 foreach (var candidate in game.Sites)
                 {
-                    if (candidate.State != Game.World.SiteState.Active || !candidate.Energy.CanSpend) continue;
+                    if (candidate.State != Game.World.SiteState.Active) continue;
                     if (site == null || candidate.Plan.TotalWork < site.Plan.TotalWork) site = candidate;
                 }
-                if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up, byPlayer: true);
+                if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up, player);
                 game.BuyWorker();
                 game.BuyHammer();
                 game.UseCola();

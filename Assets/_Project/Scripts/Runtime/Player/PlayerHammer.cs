@@ -7,26 +7,26 @@ using UnityEngine.InputSystem;
 namespace Game.Player
 {
     /// <summary>Turns the Build input into hammer hits on the nearest plot in reach, and Use into drinking a cola.</summary>
-    [RequireComponent(typeof(GameInput))]
+    [RequireComponent(typeof(GameInput), typeof(Character))]
     public sealed class PlayerHammer : MonoBehaviour
     {
         [SerializeField] GameController game;
         [SerializeField] WorkerVisual visual;
-        [SerializeField] MeterBar energyBar;
 
         GameInput input;
+        Character character;
         float cooldown;
         float lastHintTime = -10f;
 
-        void Awake() => input = GetComponent<GameInput>();
+        void Awake()
+        {
+            input = GetComponent<GameInput>();
+            character = GetComponent<Character>();
+        }
 
         void Update()
         {
             cooldown -= Time.deltaTime;
-
-            var tired = game.PlayerEnergy.IsExhausted && !game.Boost.IsActive;
-            visual.SetTired(tired);
-            energyBar.Set(game.PlayerEnergy.Fraction, tired);
 
             if (input.UsePressedThisFrame) game.UseCola();
 
@@ -48,7 +48,7 @@ namespace Game.Player
             }
 
             var point = Vector3.Lerp(transform.position, site.transform.position, 0.55f) + Vector3.up * 1.2f;
-            var result = game.TryHit(site, game.HammerPower, point, byPlayer: true);
+            var result = game.TryHit(site, game.HammerPower, point, character);
             switch (result)
             {
                 case HitResult.Hit:
@@ -59,11 +59,8 @@ namespace Game.Player
                     if (toSite.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(toSite.normalized);
                     visual.Swing();
                     break;
-                case HitResult.PlayerTired:
+                case HitResult.Tired:
                     Hint("Yoruldun! Biraz dinlen (ya da Sarı Kola iç: E)");
-                    break;
-                case HitResult.SiteTired:
-                    Hint("Şantiye dinleniyor, başka bir inşaata geç!");
                     break;
             }
         }

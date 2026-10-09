@@ -57,7 +57,9 @@ namespace Game.Editor
             var game = gameGo.AddComponent<GameController>();
             EditorWire.Set(gameGo.AddComponent<DevCommands>(), "game", game);
 
-            var player = BuildPlayer(game, palette);
+            var player = BuildPlayer(game);
+            EditorWire.Set(game, "player", player.GetComponent<Character>());
+            EditorWire.Set(gameGo.GetComponent<DevCommands>(), "player", player.GetComponent<Character>());
             BuildCamera(player.transform);
 
             var spawner = new GameObject("ColaSpawner").AddComponent<ColaSpawner>();
@@ -262,7 +264,7 @@ namespace Game.Editor
 
         // ---------- player / camera ----------
 
-        static PlayerController BuildPlayer(GameController game, ToonPalette palette)
+        static PlayerController BuildPlayer(GameController game)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ArtBuilder.WorkerPrefabPath);
             var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
@@ -283,10 +285,6 @@ namespace Game.Editor
             EditorWire.Set(hammer, "game", game);
             EditorWire.Set(hammer, "visual", visual);
 
-            // Small energy bar floating over the player's head (only visible while it's not full).
-            var bar = MeterBar.Create(go.transform, "EnergyBar", new Vector3(0f, 2.3f, 0f), 1.0f, 0.16f,
-                palette.barBack, palette.energyFill, palette.energyLow, hideWhenFull: true);
-            EditorWire.Set(hammer, "energyBar", bar);
             return controller;
         }
 
@@ -346,12 +344,11 @@ namespace Game.Editor
             var victoryText = Label(root, "Victory", font, outlineMat, 110, new Color(1f, 0.86f, 0.25f), TextAlignmentOptions.Center,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 60f), new Vector2(1500f, 300f));
 
-            // Energy: player and the plot in reach.
-            var energyPanel = Panel(root, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -155f), new Vector2(380f, 150f));
-            EnergyRow(energyPanel, rounded, font, "ENERJİ", -10f, out _, out var playerFill, out var playerFillImage);
-            EnergyRow(energyPanel, rounded, font, "Şantiye", -80f, out var siteLabel, out var siteFill, out var siteFillImage);
+            // The player's energy (workers show theirs above their heads).
+            var energyPanel = Panel(root, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -155f), new Vector2(380f, 84f));
+            EnergyRow(energyPanel, rounded, font, "ENERJİ", -8f, out _, out var playerFill, out var playerFillImage);
 
-            var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(0f, 1f), new Vector2(40f, -320f), new Vector2(380f, 84f),
+            var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(0f, 1f), new Vector2(40f, -255f), new Vector2(380f, 84f),
                 new Color(1f, 0.84f, 0.2f), 32, out var colaUseLabel);
 
             var boostText = Label(root, "Boost", font, outlineMat, 60, new Color(1f, 0.6f, 0.15f), TextAlignmentOptions.Center,
@@ -377,9 +374,6 @@ namespace Game.Editor
             EditorWire.Set(hud, "colaUseLabel", colaUseLabel);
             EditorWire.Set(hud, "playerEnergyFill", playerFill);
             EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
-            EditorWire.Set(hud, "siteEnergyFill", siteFill);
-            EditorWire.Set(hud, "siteEnergyImage", siteFillImage);
-            EditorWire.Set(hud, "siteEnergyLabel", siteLabel);
             return hud;
         }
 

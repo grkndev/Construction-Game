@@ -9,24 +9,25 @@ namespace Game.Core
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 
-        // Tuned with a small simulation that includes the energy bars (greedy upgrade buying, ~5.5 hits/s when
-        // allowed, workers spread over the plots, a free cola every ~45 s): ~8 minutes for an attentive player,
-        // first building done after ~25 s, ~22 purchases. Real play is slower than the model, so expect 10-12.
+        // Tuned with tools/balance_sim.py (energy included, greedy upgrade buying, ~5.5 hits/s when allowed,
+        // a free cola every ~45 s): buildings finish at roughly 0.2 / 0.7 / 1.9 / 4.1 / 8.3 minutes for an
+        // attentive player. Real play is slower than the model, so expect 10-12 minutes in total.
         public static readonly BuildPlan[] Plans =
         {
-            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 9,    completionBonus: 22),
-            new BuildPlan("Ev",        floors: 3,  workPerFloor: 75,   completionBonus: 90),
-            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 210,  completionBonus: 330),
-            new BuildPlan("Otel",      floors: 7,  workPerFloor: 510,  completionBonus: 1200),
-            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 1260, completionBonus: 4500),
+            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 30,   completionBonus: 37),
+            new BuildPlan("Ev",        floors: 3,  workPerFloor: 125,  completionBonus: 150),
+            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 350,  completionBonus: 550),
+            new BuildPlan("Otel",      floors: 7,  workPerFloor: 850,  completionBonus: 2000),
+            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 2100, completionBonus: 7500),
         };
 
-        // ---- Energy: the player tires when hammering and recovers when still; every plot has its own energy
-        // that any hit (player or worker) drains. Spreading effort over several plots is how you keep going.
+        // ---- Energy: every character (the player and each hired worker) has their own bar. A hit costs energy,
+        // standing still refills it, and running dry forces a rest until it has recovered to ResumeFraction.
         public static readonly EnergySettings PlayerEnergy = new EnergySettings(
             max: 100f, cost: 4f, fullRegen: 20f, restDelay: 0.6f, activeRegen: 0f, resumeFraction: 0.4f);
-        public static readonly EnergySettings SiteEnergy = new EnergySettings(
-            max: 100f, cost: 3f, fullRegen: 15f, restDelay: 1.0f, activeRegen: 3f, resumeFraction: 0.3f);
+        // A worker hits every ~1.1 s: ~12 hits per full bar, then a ~4 s rest.
+        public static readonly EnergySettings WorkerEnergy = new EnergySettings(
+            max: 100f, cost: 8f, fullRegen: 12f, restDelay: 1.0f, activeRegen: 0f, resumeFraction: 0.4f);
 
         // ---- Sarı Kola
         public const float BoostSeconds = 15f;           // "Coşku": bought cola only
