@@ -70,7 +70,7 @@ namespace Game.UI
                 else
                     cards[i].Show(def.Name, $"{state.CompletedCount}/{state.PlotCount} bina  %{Mathf.FloorToInt(state.Fraction * 100f)}", Open, locked: false);
             }
-            tipPlate.Text = game.CityComplete ? "" : "Bir mahalle seç";
+            tipPlate.Text = game.CityComplete ? "Şehir tamamlandı! Bozulan binaları onarmaya devam et" : "Bir mahalle seç";
         }
 
         void LateUpdate()

@@ -41,6 +41,7 @@ namespace Game.UI
         GameController game;
         float hintTimer;
         float levelTimer;
+        float victoryTimer;
 
         public void Bind(GameController controller)
         {
@@ -49,6 +50,7 @@ namespace Game.UI
             game.StateChanged += Refresh;
             game.ModeChanged += OnModeChanged;
             game.LeveledUp += OnLeveledUp;
+            game.CityCompleted += OnCityCompleted;
             game.Level.Changed += Refresh;
             game.Hint += ShowHint;
             game.Story += ShowHint;
@@ -79,6 +81,14 @@ namespace Game.UI
             }
         }
 
+        // The big congratulation is shown once, for a few seconds, and then goes away.
+        void OnCityCompleted()
+        {
+            victoryPlate.Text = "Şehir tamamlandı!\nHarika iş çıkardın";
+            victoryPlate.Alpha = 1f;
+            victoryTimer = 6f;
+        }
+
         void OnLeveledUp(int level)
         {
             levelPlate.Text = $"SEVİYE {level}!";
@@ -93,6 +103,7 @@ namespace Game.UI
             game.StateChanged -= Refresh;
             game.ModeChanged -= OnModeChanged;
             game.LeveledUp -= OnLeveledUp;
+            game.CityCompleted -= OnCityCompleted;
             game.Level.Changed -= Refresh;
             game.Hint -= ShowHint;
             game.Story -= ShowHint;
@@ -125,6 +136,13 @@ namespace Game.UI
                 if (levelTimer <= 0f) levelPlate.Text = "";
             }
 
+            if (victoryTimer > 0f)
+            {
+                victoryTimer -= Time.deltaTime;
+                victoryPlate.Alpha = Mathf.Clamp01(victoryTimer);
+                if (victoryTimer <= 0f) victoryPlate.Text = "";
+            }
+
             if (!game.InDistrict) return;
 
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
@@ -139,7 +157,6 @@ namespace Game.UI
             else if (game.LevelBuff.IsActive) boostPlate.Text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
             else boostPlate.Text = "";
 
-            if (game.CityComplete) return;
             var focus = game.FocusSite;
             buildingPlate.Text = focus != null
                 ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
@@ -164,12 +181,6 @@ namespace Game.UI
 
             colaUseLabel.text = $"Sarı Kola  x{game.ColaCount}";
             colaUseButton.interactable = game.ColaCount > 0;
-
-            if (game.CityComplete)
-            {
-                buildingPlate.Text = "";
-                victoryPlate.Text = "Şehir tamamlandı!\nHarika iş çıkardın";
-            }
         }
     }
 }

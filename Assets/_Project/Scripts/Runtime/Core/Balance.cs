@@ -16,31 +16,32 @@ namespace Game.Core
 
         // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
         // district for prices, hit power, work and rewards) with its own upgrades, and later districts also have bigger buildings
-        // (the numbers below are first-district shapes times a per-district size: x1, 2.6, 5.2, 9, 13), so they take longer.
-        // Tuned with tools/balance_sim.py (attentive player, all upgrades, own coins in every district, one free helper to start):
-        // about 2.6 / 4.3 / 6.4 / 9 / 11.7 minutes per district, 34 in all; real play is ~25% slower and has walking on top.
+        // (the numbers below are first-district shapes times a per-district size: x0.85, 2, 4, 7, 10), so they take longer.
+        // Tuned with tools/balance_sim.py (attentive player, all upgrades, own coins in every district, one free helper to start,
+        // coins = 60% of the work): about 3.1 / 4.7 / 6.8 / 9.3 / 11.6 minutes per district, 36 in all; real play is ~25% slower
+        // and has walking on top.
         public static readonly DistrictDef[] Districts =
         {
             new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
-                new BuildPlan("Kulübe",         3, 90,   120,   xp: 1),
-                new BuildPlan("Balıkçı Evi",    4, 300,  420,   xp: 2),
-                new BuildPlan("Pansiyon",       6, 800,  1300,  xp: 3)),
+                new BuildPlan("Kulübe",         3, 76,   102,   xp: 1),
+                new BuildPlan("Balıkçı Evi",    4, 255,  357,   xp: 2),
+                new BuildPlan("Pansiyon",       6, 680,  1105,  xp: 3)),
             new DistrictDef("Merkez", requiredLevel: 3, scale: 4,
-                new BuildPlan("Dükkan",         3, 234,  312,   xp: 2),
-                new BuildPlan("Kafe",           4, 780,  1092,  xp: 3),
-                new BuildPlan("Belediye",       6, 2080, 3380,  xp: 4)),
+                new BuildPlan("Dükkan",         3, 180,  240,   xp: 2),
+                new BuildPlan("Kafe",           4, 600,  840,   xp: 3),
+                new BuildPlan("Belediye",       6, 1600, 2600,  xp: 4)),
             new DistrictDef("Liman",  requiredLevel: 5, scale: 16,
-                new BuildPlan("Depo",           3, 468,  624,   xp: 3),
-                new BuildPlan("Lokanta",        4, 1560, 2184,  xp: 4),
-                new BuildPlan("Gümrük",         6, 4160, 6760,  xp: 6)),
+                new BuildPlan("Depo",           3, 360,  480,   xp: 3),
+                new BuildPlan("Lokanta",        4, 1200, 1680,  xp: 4),
+                new BuildPlan("Gümrük",         6, 3200, 5200,  xp: 6)),
             new DistrictDef("Tepe",   requiredLevel: 7, scale: 64,
-                new BuildPlan("Değirmen",       3, 810,  1080,  xp: 4),
-                new BuildPlan("Çiftlik Evi",    4, 2700, 3780,  xp: 5),
-                new BuildPlan("Fener",          6, 7200, 11700, xp: 7)),
+                new BuildPlan("Değirmen",       3, 630,  840,   xp: 4),
+                new BuildPlan("Çiftlik Evi",    4, 2100, 2940,  xp: 5),
+                new BuildPlan("Fener",          6, 5600, 9100,  xp: 7)),
             new DistrictDef("Sanayi", requiredLevel: 9, scale: 256,
-                new BuildPlan("Atölye",         3, 1170, 1560,  xp: 5),
-                new BuildPlan("Fabrika",        4, 3900, 5460,  xp: 6),
-                new BuildPlan("Baca Kulesi",    6, 10400, 16900, xp: 8)),
+                new BuildPlan("Atölye",         3, 900,  1200,  xp: 5),
+                new BuildPlan("Fabrika",        4, 3000, 4200,  xp: 6),
+                new BuildPlan("Baca Kulesi",    6, 8000, 13000, xp: 8)),
         };
 
         /// <summary>Total XP needed to reach level i + 1 (so index 0 is level 1 = 0 XP).</summary>
@@ -90,8 +91,29 @@ namespace Game.Core
         public const float ColaSpawnMax = 28f;
         public const float ColaLifetime = 35f;
 
-        /// <summary>Scales with the hammer so it stays a real decision as income grows (60 at start, ~1100 at level 14).</summary>
-        public static long ColaPrice(int hammerLevel) => 60 + (long)Math.Round(35 * Math.Pow(hammerLevel, 1.3));
+        // ---- Coins: every point of work earns this many coins (and the same share of a building's completion bonus).
+        public const float CoinsPerWork = 0.6f;
+
+        public static long CoinsFor(long work) => Math.Max(1L, (long)Math.Round(work * CoinsPerWork));
+
+        // ---- Coşku price. The bought cola makes everybody work ~3x as fast for 15 s, so it is priced by what a district earns:
+        // ColaPriceSeconds seconds of normal income. Measured with tools/balance_sim.py: a player lands ~2.0 hits/s and a helper ~0.8
+        // hits/s (energy limits both), and Coşku is worth about 30 s of normal income on top of what it costs.
+        public const float ColaPriceSeconds = 40f;
+        const double PlayerHitsPerSecond = 2.0;
+        const double WorkerHitsPerSecond = 0.8;
+
+        /// <summary>Rough coins per second a district earns with this setup when nobody drinks cola (only used to price Coşku).</summary>
+        public static double EstimatedIncomePerSecond(int hammerLevel, int workers, int speedLevel, int scale)
+        {
+            var player = PlayerHitsPerSecond * HammerPower(hammerLevel);
+            var helpers = workers * WorkerHitsPerSecond * WorkerPower(hammerLevel);
+            return scale * CoinsPerWork * SpeedMultiplier(speedLevel) * (player + helpers);
+        }
+
+        /// <summary>Grows with the hammer, the helpers and the speed upgrade, so Coşku never gets cheap as income grows.</summary>
+        public static long ColaPrice(int hammerLevel, int workers, int speedLevel, int scale) =>
+            Math.Max(60L * scale, (long)Math.Round(ColaPriceSeconds * EstimatedIncomePerSecond(hammerLevel, workers, speedLevel, scale)));
 
         // ---- Speed upgrade: a character's whole pace (walking, swinging and recovering energy) gets faster.
         public const int MaxSpeedLevel = 5;
@@ -99,7 +121,7 @@ namespace Game.Core
 
         public static UpgradeTrack NewSpeedTrack(int scale = 1) => new UpgradeTrack(baseCost: 100L * scale, growth: 2.0, maxLevel: MaxSpeedLevel - 1);
 
-        /// <summary>Pace multiplier for a speed level: 1.0 at level 0, +15% per level (1.75 at the maximum).</summary>
+        /// <summary>Pace multiplier for a speed level: 1.0 at level 0, +15% per level (1.6 at the last tier, level 4).</summary>
         public static float SpeedMultiplier(int level) => 1f + SpeedPerLevel * level;
 
         public static UpgradeTrack NewHammerTrack(int scale = 1) => new UpgradeTrack(baseCost: 20L * scale, growth: 1.5, maxLevel: MaxHammerLevel - 1);

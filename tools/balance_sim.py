@@ -32,6 +32,7 @@ class Meter:
 
 LEVEL_BONUS, COLA_LEVEL_SECONDS = 5, 10.0
 SPEED_PER_LEVEL = 0.15
+COINS_PER_WORK = 0.6   # Balance.CoinsPerWork: coins earned per point of work (and on the completion bonus)
 STAMINA_MAX, STAMINA_REGEN = 0.20, 0.15
 
 
@@ -68,9 +69,9 @@ def sim(plans, hammer, worker, stamina, P, W, speed=None, hit_rate=5.5, interval
 
     def hit(j, power):
         nonlocal coins
-        use = min(power, remaining[j]); remaining[j] -= use; coins += use
+        use = min(power, remaining[j]); remaining[j] -= use; coins += use * COINS_PER_WORK
         if remaining[j] <= 1e-9 and j not in done:
-            done[j] = t; coins += bonus[j]
+            done[j] = t; coins += bonus[j] * COINS_PER_WORK
 
     while t < tmax and any(r > 0 for r in remaining):
         if t >= next_cola:
@@ -122,7 +123,7 @@ WORKER = (100, 8, 12, 1.0, 0, 0.4)
 # Mirror of Balance.Districts (first-district numbers; the game scales work/bonus/prices/power by `scale`), see Balance.cs.
 SHAPE = [(3, 90, 120), (4, 300, 420), (6, 800, 1300)]
 # (name, scale, size): `size` multiplies the buildings' work/bonus on top of the scale so later districts take longer.
-DISTRICTS = [("Sahil", 1, 1.0), ("Merkez", 4, 2.6), ("Liman", 16, 5.2), ("Tepe", 64, 9.0), ("Sanayi", 256, 13.0)]
+DISTRICTS = [("Sahil", 1, 0.85), ("Merkez", 4, 2.0), ("Liman", 16, 4.0), ("Tepe", 64, 7.0), ("Sanayi", 256, 10.0)]
 HIT_RATE = 1 / 0.35   # PlayerHammer attacks as soon as the cooldown allows (Balance.HitCooldown); energy is the real limit
 
 

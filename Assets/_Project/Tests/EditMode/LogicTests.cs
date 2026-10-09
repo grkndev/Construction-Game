@@ -337,8 +337,8 @@ namespace Game.Tests
         [Test]
         public void ColaPrice_GrowsWithHammerLevel_AndStartsCheap()
         {
-            Assert.AreEqual(60, Balance.ColaPrice(0));
-            for (var l = 1; l <= 25; l++) Assert.Greater(Balance.ColaPrice(l), Balance.ColaPrice(l - 1));
+            Assert.That(Balance.ColaPrice(0, 1, 0, 1), Is.InRange(60, 90));   // the first cola must be reachable from the first building
+            for (var l = 1; l <= 25; l++) Assert.Greater(Balance.ColaPrice(l, 4, 0, 1), Balance.ColaPrice(l - 1, 4, 0, 1));
         }
 
         [Test]

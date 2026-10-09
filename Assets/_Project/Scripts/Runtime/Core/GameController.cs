@@ -62,7 +62,7 @@ namespace Game.Core
         public UpgradeTrack Stamina => CurrentState.Stamina;
         public UpgradeTrack Speed => CurrentState.Speed;
         int Scale => CurrentState?.Def.Scale ?? 1;
-        public long ColaPrice => Balance.ColaPrice(Hammer.Level) * Scale;
+        public long ColaPrice => Balance.ColaPrice(Hammer.Level, Workers.Tier, Speed.Level, Scale);
         /// <summary>Hammer level including the temporary cola bonus; this is what hits actually use.</summary>
         public int EffectiveLevel => Hammer.Level + (LevelBuff.IsActive ? Balance.LevelBonus : 0);
         public int HammerPower => Balance.HammerPower(EffectiveLevel) * Scale;
@@ -84,6 +84,8 @@ namespace Game.Core
         /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
         public event Action ShopToggleRequested;
         public event Action<int> LeveledUp;
+        /// <summary>The last building of the last district was just finished (not raised for a save that was already complete).</summary>
+        public event Action CityCompleted;
         /// <summary>Something happened that deserves a sound (played by the audio manager).</summary>
         public event Action<SfxKind> Sfx;
         /// <summary>A longer story line (text, seconds) for the HUD: the opening and each district's first visit.</summary>
@@ -346,9 +348,10 @@ namespace Game.Core
             if (applied == 0) return HitResult.NoTarget;
 
             if (!free) actor.Energy.TrySpend();
-            Economy.Add(applied);
+            var earned = Balance.CoinsFor(applied);
+            Economy.Add(earned);
             Sfx?.Invoke(actor.IsPlayer ? SfxKind.HitPlayer : SfxKind.HitWorker);
-            Popup($"+{NumberFormat.Compact(applied)}", point, coinColor, 1f);
+            Popup($"+{NumberFormat.Compact(earned)}", point, coinColor, 1f);
             return HitResult.Hit;
         }
 
@@ -385,8 +388,9 @@ namespace Game.Core
             states[d].PlotWork[p] = site.Plan.TotalWork;
             SpawnResident(d, p, announce: true);
 
-            states[d].Economy.Add(site.Plan.CompletionBonus);
-            Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(site.Plan.CompletionBonus)}",
+            var bonus = Balance.CoinsFor(site.Plan.CompletionBonus);
+            states[d].Economy.Add(bonus);
+            Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(bonus)}",
                 site.transform.position + Vector3.up * 4.5f, bonusColor, 1.7f);
             Sfx?.Invoke(SfxKind.BuildingDone);
             Level.Add(site.Plan.Xp);
@@ -407,6 +411,7 @@ namespace Game.Core
         {
             yield return new WaitForSeconds(seconds);   // let the last confetti play before the victory text
             CityComplete = true;
+            CityCompleted?.Invoke();
             StateChanged?.Invoke();
         }
 

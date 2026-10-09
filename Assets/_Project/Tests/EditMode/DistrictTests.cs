@@ -364,7 +364,7 @@ namespace Game.Tests
             foreach (var d in Balance.Districts)
             {
                 var first = d.Plans[0];
-                Assert.GreaterOrEqual(first.TotalWork + first.CompletionBonus, Balance.NewHammerTrack(d.Scale).NextCost, d.Name);
+                Assert.GreaterOrEqual(Balance.CoinsFor(first.TotalWork) + Balance.CoinsFor(first.CompletionBonus), Balance.NewHammerTrack(d.Scale).NextCost, d.Name);
             }
         }
 
@@ -440,9 +440,31 @@ namespace Game.Tests
             // Like the other upgrades: the first two buildings of a district must pay for the first speed level.
             foreach (var d in Balance.Districts)
             {
-                var earned = d.Plans[0].TotalWork + d.Plans[0].CompletionBonus + d.Plans[1].TotalWork + d.Plans[1].CompletionBonus;
+                var earned = Balance.CoinsFor(d.Plans[0].TotalWork) + Balance.CoinsFor(d.Plans[0].CompletionBonus) + Balance.CoinsFor(d.Plans[1].TotalWork) + Balance.CoinsFor(d.Plans[1].CompletionBonus);
                 Assert.GreaterOrEqual(earned, Balance.NewSpeedTrack(d.Scale).NextCost, d.Name);
             }
+        }
+
+        [Test]
+        public void Coşku_CostsAtLeastAsMuchIncomeAsItGivesBack_AtEveryStage()
+        {
+            // Coşku is worth ~30 s of normal income on top of what it costs; the price must stay clearly above one minute of
+            // income's worth of "free" money, otherwise standing still and buying it again and again is the best strategy.
+            foreach (var d in Balance.Districts)
+                foreach (var (hammer, workers, speed) in new[] { (0, 1, 0), (10, 5, 2), (24, 8, 4) })
+                {
+                    var income = Balance.EstimatedIncomePerSecond(hammer, workers, speed, d.Scale);
+                    var price = Balance.ColaPrice(hammer, workers, speed, d.Scale);
+                    Assert.GreaterOrEqual(price, income * 30.0, $"{d.Name} L{hammer}/{workers}/{speed}");
+                }
+        }
+
+        [Test]
+        public void CoinsFor_IsAShareOfTheWork_AndNeverZero()
+        {
+            Assert.AreEqual(1, Balance.CoinsFor(1));
+            Assert.AreEqual(60, Balance.CoinsFor(100));
+            Assert.Less(Balance.CoinsFor(1000), 1000);
         }
 
         [Test]
