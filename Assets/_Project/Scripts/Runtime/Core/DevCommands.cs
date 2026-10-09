@@ -107,6 +107,7 @@ namespace Game.Core
                 game.BuyWorker();
                 game.BuyHammer();
                 game.BuyStamina();
+                game.BuySpeed();
                 game.UseCola();
                 yield return wait;
             }

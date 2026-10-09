@@ -29,7 +29,7 @@ namespace Game.Core
         [SerializeField] IsoCameraFollow cameraRig;
         [SerializeField] Transform overviewTarget;
         [SerializeField] ToonPalette palette;
-        [SerializeField] float overviewScale = 6.3f;
+        [SerializeField] float overviewScale = 7.2f;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
         [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);
@@ -59,6 +59,7 @@ namespace Game.Core
         public UpgradeTrack Hammer => CurrentState.Hammer;
         public UpgradeTrack Workers => CurrentState.Workers;
         public UpgradeTrack Stamina => CurrentState.Stamina;
+        public UpgradeTrack Speed => CurrentState.Speed;
         int Scale => CurrentState?.Def.Scale ?? 1;
         public long ColaPrice => Balance.ColaPrice(Hammer.Level) * Scale;
         /// <summary>Hammer level including the temporary cola bonus; this is what hits actually use.</summary>
@@ -475,6 +476,16 @@ namespace Game.Core
             StateChanged?.Invoke();
         }
 
+        public void BuySpeed()
+        {
+            if (!InDistrict || !Speed.TryBuy(Economy)) return;
+            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);
+            var percent = Mathf.RoundToInt((Balance.SpeedMultiplier(Speed.Level) - 1f) * 100f);
+            ShowHint($"Hız arttı! Herkes %{percent} daha hızlı yürüyor, vuruyor ve toparlanıyor.");
+            Popup($"HIZ Sv.{Speed.Level}!", player.transform.position + Vector3.up * 3.6f, new Color(0.55f, 0.85f, 1f), 1.5f);
+            StateChanged?.Invoke();
+        }
+
         // ---------- Sarı Kola ----------
 
         /// <summary>Picked up from the island. False when the pockets are full.</summary>
@@ -524,7 +535,8 @@ namespace Game.Core
         void ApplyEffectsTo(Character character)
         {
             character.ApplyStamina(CurrentState != null ? CurrentState.Stamina.Level : 0);
-            character.SetBuffs(LevelBuff.IsActive, Boost.IsActive ? Balance.BoostSpeedMultiplier : 1f);
+            var pace = CurrentState != null ? Balance.SpeedMultiplier(CurrentState.Speed.Level) : 1f;
+            character.SetBuffs(LevelBuff.IsActive, (Boost.IsActive ? Balance.BoostSpeedMultiplier : 1f) * pace);
         }
 
         void RefillEnergy()

@@ -92,6 +92,7 @@ namespace Game.Tests
             s.Hammer.SetLevel(4);
             s.Workers.SetLevel(2);
             s.Stamina.SetLevel(3);
+            s.Speed.SetLevel(2);
             Finish(s, 0);
             s.PlotWork[1] = 50;
             s.Break(0, 2);
@@ -105,6 +106,7 @@ namespace Game.Tests
             Assert.AreEqual(4, copy.Hammer.Level);
             Assert.AreEqual(2, copy.Workers.Level);
             Assert.AreEqual(3, copy.Stamina.Level);
+            Assert.AreEqual(2, copy.Speed.Level);
             CollectionAssert.AreEqual(s.PlotWork, copy.PlotWork);
             CollectionAssert.AreEqual(s.Issues, copy.Issues);
             Assert.AreEqual(7, copy.RepairWork[0]);
@@ -387,6 +389,30 @@ namespace Game.Tests
                 var previous = Balance.Districts[i - 1];
                 var current = Balance.Districts[i];
                 Assert.Greater(current.Plans[2].TotalWork / current.Scale, previous.Plans[2].TotalWork / previous.Scale, current.Name);
+            }
+        }
+
+        [Test]
+        public void SpeedUpgrade_StopsAtFive_AndEachLevelIsFaster()
+        {
+            var track = Balance.NewSpeedTrack();
+            Assert.AreEqual(Balance.MaxSpeedLevel, 5);
+            Assert.AreEqual(1f, Balance.SpeedMultiplier(0));
+            for (var level = 1; level <= Balance.MaxSpeedLevel; level++)
+                Assert.Greater(Balance.SpeedMultiplier(level), Balance.SpeedMultiplier(level - 1));
+            track.SetLevel(99);
+            Assert.IsTrue(track.IsMaxed);
+            Assert.AreEqual(5, track.Level);
+        }
+
+        [Test]
+        public void SpeedUpgrade_IsAffordableFromTheFirstDistrictsEarlyBuildings()
+        {
+            // Like the other upgrades: the first two buildings of a district must pay for the first speed level.
+            foreach (var d in Balance.Districts)
+            {
+                var earned = d.Plans[0].TotalWork + d.Plans[0].CompletionBonus + d.Plans[1].TotalWork + d.Plans[1].CompletionBonus;
+                Assert.GreaterOrEqual(earned, Balance.NewSpeedTrack(d.Scale).NextCost, d.Name);
             }
         }
 

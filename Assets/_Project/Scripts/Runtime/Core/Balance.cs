@@ -12,8 +12,8 @@ namespace Game.Core
         // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
         // district for prices, hit power, work and rewards) with its own upgrades, and later districts also have bigger buildings
         // (the numbers below are first-district shapes times a per-district size: x1, 2.6, 5.2, 9, 13), so they take longer.
-        // Tuned with tools/balance_sim.py (attentive player): about 2.5 / 4.2 / 6.2 / 9 / 12 minutes per district, 34 in all;
-        // real play is ~25% slower, so expect roughly 40-45 minutes for the whole city.
+        // Tuned with tools/balance_sim.py (attentive player, all upgrades incl. Hız): about 2.3 / 3.1 / 4.5 / 6.8 / 7.7 minutes per
+        // district, 24 in all (34 without the speed upgrade); real play is ~25% slower and has walking on top.
         public static readonly DistrictDef[] Districts =
         {
             new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
@@ -87,6 +87,15 @@ namespace Game.Core
 
         /// <summary>Scales with the hammer so it stays a real decision as income grows (60 at start, ~1100 at level 14).</summary>
         public static long ColaPrice(int hammerLevel) => 60 + (long)Math.Round(35 * Math.Pow(hammerLevel, 1.3));
+
+        // ---- Speed upgrade: a character's whole pace (walking, swinging and recovering energy) gets faster.
+        public const int MaxSpeedLevel = 5;
+        public const float SpeedPerLevel = 0.15f;
+
+        public static UpgradeTrack NewSpeedTrack(int scale = 1) => new UpgradeTrack(baseCost: 100L * scale, growth: 2.0, maxLevel: MaxSpeedLevel);
+
+        /// <summary>Pace multiplier for a speed level: 1.0 at level 0, +15% per level (1.75 at the maximum).</summary>
+        public static float SpeedMultiplier(int level) => 1f + SpeedPerLevel * level;
 
         public static UpgradeTrack NewHammerTrack(int scale = 1) => new UpgradeTrack(baseCost: 20L * scale, growth: 1.5, maxLevel: 25);
         public static UpgradeTrack NewWorkerTrack(int scale = 1) => new UpgradeTrack(baseCost: 90L * scale, growth: 1.75, maxLevel: MaxWorkers);

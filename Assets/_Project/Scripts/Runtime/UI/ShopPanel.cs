@@ -21,6 +21,8 @@ namespace Game.UI
         [SerializeField] TMP_Text workerLabel;
         [SerializeField] Button staminaButton;
         [SerializeField] TMP_Text staminaLabel;
+        [SerializeField] Button speedButton;
+        [SerializeField] TMP_Text speedLabel;
         [SerializeField] Button colaBuyButton;
         [SerializeField] TMP_Text colaBuyLabel;
 
@@ -41,6 +43,7 @@ namespace Game.UI
             hammerButton.onClick.AddListener(game.BuyHammer);
             workerButton.onClick.AddListener(game.BuyWorker);
             staminaButton.onClick.AddListener(game.BuyStamina);
+            speedButton.onClick.AddListener(game.BuySpeed);
             colaBuyButton.onClick.AddListener(game.BuyCola);
             closeButton.onClick.AddListener(Close);
 
@@ -106,6 +109,12 @@ namespace Game.UI
                 ? $"DAYANIKLILIK\nEn yüksek • {now} vuruş"
                 : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\n{now} → {Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level + 1)} vuruş  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
             staminaButton.interactable = !game.Stamina.IsMaxed && game.Economy.CanAfford(game.Stamina.NextCost);
+
+            var speedPercent = Mathf.RoundToInt((Balance.SpeedMultiplier(game.Speed.Level + 1) - 1f) * 100f);
+            speedLabel.text = game.Speed.IsMaxed
+                ? $"HIZ\nEn yüksek • +%{Mathf.RoundToInt((Balance.SpeedMultiplier(game.Speed.Level) - 1f) * 100f)}"
+                : $"HIZ  Sv.{game.Speed.Level + 1}/{Balance.MaxSpeedLevel}\nYürü, vur, toparlan +%{speedPercent}  •  {NumberFormat.Compact(game.Speed.NextCost)}";
+            speedButton.interactable = !game.Speed.IsMaxed && game.Economy.CanAfford(game.Speed.NextCost);
 
             colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
             colaBuyButton.interactable = game.Economy.CanAfford(game.ColaPrice);

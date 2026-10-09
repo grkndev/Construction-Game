@@ -25,6 +25,7 @@ namespace Game.Core
         public int hammer;
         public int workers;
         public int stamina;
+        public int speed;
         public int[] plotWork = new int[0];
         public int[] issues = new int[0];        // per plot: 0 = fine, 1..N = kind of problem
         public int[] repairWork = new int[0];    // per plot: repair progress

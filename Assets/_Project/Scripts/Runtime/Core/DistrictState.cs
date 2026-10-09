@@ -12,6 +12,7 @@ namespace Game.Core
         public UpgradeTrack Hammer { get; }
         public UpgradeTrack Workers { get; }
         public UpgradeTrack Stamina { get; }
+        public UpgradeTrack Speed { get; }
 
         public int[] PlotWork { get; }
         /// <summary>Per plot: 0 = fine, otherwise the kind of problem (1..<see cref="Balance.RepairKinds"/>).</summary>
@@ -28,6 +29,7 @@ namespace Game.Core
             Hammer = Balance.NewHammerTrack(def.Scale);
             Workers = Balance.NewWorkerTrack(def.Scale);
             Stamina = Balance.NewStaminaTrack(def.Scale);
+            Speed = Balance.NewSpeedTrack(def.Scale);
             PlotWork = new int[def.Plans.Length];
             Issues = new int[def.Plans.Length];
             RepairWork = new int[def.Plans.Length];
@@ -95,6 +97,7 @@ namespace Game.Core
             hammer = Hammer.Level,
             workers = Workers.Level,
             stamina = Stamina.Level,
+            speed = Speed.Level,
             plotWork = (int[])PlotWork.Clone(),
             issues = (int[])Issues.Clone(),
             repairWork = (int[])RepairWork.Clone(),
@@ -109,6 +112,7 @@ namespace Game.Core
             Hammer.SetLevel(save.hammer);
             Workers.SetLevel(save.workers);
             Stamina.SetLevel(save.stamina);
+            Speed.SetLevel(save.speed);
             for (var i = 0; i < PlotCount; i++)
             {
                 PlotWork[i] = Math.Max(0, Math.Min(Def.Plans[i].TotalWork, Get(save.plotWork, i)));

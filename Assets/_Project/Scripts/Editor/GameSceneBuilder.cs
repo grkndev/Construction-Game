@@ -26,7 +26,8 @@ namespace Game.Editor
         const float Grow = 1.6f;
         const float PlotRing = 6.8f;
         const float DistrictRadius = 14f * Grow;
-        const float DistrictRing = DistrictRadius / 0.5878f;   // distance of each district from the island centre: neighbours touch (sin 36 deg), a lake stays in the middle
+        const float DistrictGap = 1.16f;   // >1 leaves open water between neighbouring districts on the dashboard
+        const float DistrictRing = DistrictRadius / 0.5878f * DistrictGap;   // distance of each district from the island centre (neighbours would touch at gap 1; sin 36 deg)
 
         public static void Ensure()
         {
@@ -607,7 +608,7 @@ namespace Game.Editor
             var host = Rect(root, "Shop", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             var shop = host.gameObject.AddComponent<ShopPanel>();
 
-            var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -150f), new Vector2(520f, 650f));
+            var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -150f), new Vector2(520f, 662f));
             var back = panelRt.gameObject.AddComponent<Image>();
             back.sprite = rounded;
             back.type = Image.Type.Sliced;
@@ -622,7 +623,8 @@ namespace Game.Editor
             var hammer = ShopCard(panelRt, "HammerButton", rounded, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
             var worker = ShopCard(panelRt, "WorkerButton", rounded, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
             var stamina = ShopCard(panelRt, "StaminaButton", rounded, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
-            var cola = ShopCard(panelRt, "ColaBuyButton", rounded, font, 3, new Color(1f, 0.55f, 0.3f), out var colaLabel);
+            var speed = ShopCard(panelRt, "SpeedButton", rounded, font, 3, new Color(0.62f, 0.78f, 1f), out var speedLabel);
+            var cola = ShopCard(panelRt, "ColaBuyButton", rounded, font, 4, new Color(1f, 0.55f, 0.3f), out var colaLabel);
 
             EditorWire.Set(shop, "panel", panelRt);
             EditorWire.Set(shop, "closeButton", close);
@@ -632,6 +634,8 @@ namespace Game.Editor
             EditorWire.Set(shop, "workerLabel", workerLabel);
             EditorWire.Set(shop, "staminaButton", stamina);
             EditorWire.Set(shop, "staminaLabel", staminaLabel);
+            EditorWire.Set(shop, "speedButton", speed);
+            EditorWire.Set(shop, "speedLabel", speedLabel);
             EditorWire.Set(shop, "colaBuyButton", cola);
             EditorWire.Set(shop, "colaBuyLabel", colaLabel);
             panelRt.gameObject.SetActive(false);
@@ -640,7 +644,7 @@ namespace Game.Editor
 
         static Button ShopCard(Transform parent, string name, Sprite sprite, TMP_FontAsset font, int row, Color tint, out TMP_Text label)
         {
-            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 1f), new Vector2(0f, -92f - row * 136f), new Vector2(472f, 124f), tint, 30, out label);
+            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 1f), new Vector2(0f, -88f - row * 114f), new Vector2(472f, 104f), tint, 27, out label);
             label.textWrappingMode = TextWrappingModes.Normal;
             return button;
         }

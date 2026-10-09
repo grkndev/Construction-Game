@@ -21,7 +21,7 @@ namespace Game.World
         public bool IsPlayer => kind == CharacterKind.Player;
         public EnergyMeter Energy { get; private set; }
 
-        /// <summary>Multiplies walking speed and how fast this character swings (1 normally, higher during Coşku).</summary>
+        /// <summary>Multiplies walking speed, how fast this character swings and how fast energy comes back (1 normally; the Hız upgrade and Coşku raise it).</summary>
         public float SpeedMultiplier { get; private set; } = 1f;
 
         EnergySettings BaseSettings => IsPlayer ? Balance.PlayerEnergy : Balance.WorkerEnergy;
@@ -30,7 +30,7 @@ namespace Game.World
 
         void Update()
         {
-            Energy.Tick(Time.deltaTime);
+            Energy.Tick(Time.deltaTime * SpeedMultiplier);
             visual.SetTired(Energy.IsExhausted);
             energyBar.Set(Energy.Fraction, Energy.IsExhausted);
         }
