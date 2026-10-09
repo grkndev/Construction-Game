@@ -31,6 +31,9 @@ namespace Game.Core
             yield return new WaitForEndOfFrame();
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
             File.WriteAllBytes(shot, tex.EncodeToPNG());
+            var spread = string.Join(",", System.Array.ConvertAll(
+                FindObjectsByType<Game.World.BuildSite>(FindObjectsSortMode.InstanceID), x => $"{x.Plan.Name}:{x.AssignedWorkers}{(x.IsComplete ? "(done)" : "")}"));
+            Debug.Log($"[Dev] workers per plot: {spread}");
             Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, done={game.CompletedCount}/{game.TotalCount}");
             Application.Quit();
         }
@@ -41,7 +44,7 @@ namespace Game.Core
             var wait = new WaitForSeconds(0.12f);
             while (!game.AllDone)
             {
-                var site = game.ActiveSite;
+                var site = game.NearestWorkableSite(Vector3.zero, 1000f);   // any unfinished plot
                 if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up);
                 game.BuyWorker();
                 game.BuyHammer();

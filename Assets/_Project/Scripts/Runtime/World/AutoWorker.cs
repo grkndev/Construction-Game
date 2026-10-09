@@ -11,19 +11,27 @@ namespace Game.World
         [SerializeField] WorkerVisual visual;
 
         GameController game;
+        BuildSite site;
         int slot;
         float timer;
 
-        public void Initialize(GameController owner, int slotIndex)
+        public void Initialize(GameController owner)
         {
             game = owner;
-            slot = slotIndex;
             timer = Random.value * Balance.WorkerHitInterval;   // desynchronise helpers so hits don't stack up
         }
 
+        void OnDestroy() => site?.ReleaseWorker();
+
         void Update()
         {
-            var site = game != null ? game.ActiveSite : null;
+            // Pick (or re-pick after the plot is finished) the unfinished plot with the fewest helpers.
+            if (site == null || site.IsComplete)
+            {
+                site?.ReleaseWorker();
+                site = game != null ? game.PickSiteForWorker(transform.position) : null;
+                if (site != null) slot = site.ClaimSlot();
+            }
             if (site == null)
             {
                 visual.SetMove(0f);

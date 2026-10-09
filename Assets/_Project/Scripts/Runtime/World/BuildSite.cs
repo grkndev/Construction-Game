@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Game.World
 {
-    public enum SiteState { Locked, Active, Done }
+    public enum SiteState { Active, Done }
 
     /// <summary>
     /// One construction plot. The building is assembled from primitives at startup (floors, windows,
@@ -45,6 +45,18 @@ namespace Game.World
         public int FloorsBuilt => progress?.FloorsBuilt ?? 0;
         public event Action<BuildSite> Completed;
 
+        /// <summary>How many auto-workers currently work here; the dispatcher sends new ones to the emptiest plot.</summary>
+        public int AssignedWorkers { get; private set; }
+        int nextSlot;
+
+        public int ClaimSlot()
+        {
+            AssignedWorkers++;
+            return nextSlot++;
+        }
+
+        public void ReleaseWorker() => AssignedWorkers = Mathf.Max(0, AssignedWorkers - 1);
+
         public void Initialize(BuildPlan buildPlan, int plotIndex, TMP_Text nameLabel)
         {
             plan = buildPlan;
@@ -55,7 +67,7 @@ namespace Game.World
             progress.Completed += OnCompleted;
 
             Build();
-            SetState(SiteState.Locked);
+            SetState(SiteState.Active);
         }
 
         void Build()
@@ -170,7 +182,7 @@ namespace Game.World
             barRoot.gameObject.SetActive(!done);
             marker.gameObject.SetActive(active);
             scaffold.SetActive(!done);
-            if (label != null) label.alpha = active ? 1f : 0.55f;
+            if (label != null) label.alpha = 1f;
         }
 
         /// <summary>Applies work and returns how much was used. 0 if the plot isn't the active one.</summary>

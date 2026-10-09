@@ -33,7 +33,7 @@ namespace Game.UI
             workerButton.onClick.AddListener(game.BuyWorker);
             victoryText.gameObject.SetActive(false);
 
-            ShowHint("WASD / sol çubuk: yürü    SPACE / tık / A: çekiç vur", 6f);
+            ShowHint("WASD / sol çubuk: yürü    SPACE / tık / A: çekiç vur    İstediğin inşaata git!", 7f);
             Refresh();
         }
 
@@ -65,10 +65,12 @@ namespace Game.UI
                 hintText.alpha = Mathf.Clamp01(hintTimer * 2f);
             }
 
-            // The bar text changes on every hit; cheap enough to refresh each frame and avoids an extra event.
-            var site = game.ActiveSite;
-            if (site != null)
-                buildingText.text = $"{site.Plan.Name}   Kat {site.FloorsBuilt}/{site.Plan.Floors}   %{Mathf.FloorToInt(site.Fraction * 100f)}";
+            // The text changes on every hit; cheap enough to refresh each frame and avoids an extra event.
+            if (game.AllDone) return;
+            var focus = game.FocusSite;
+            buildingText.text = focus != null
+                ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
+                : $"İnşaatlar  {game.CompletedCount}/{game.TotalCount}";
         }
 
         void Refresh()

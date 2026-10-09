@@ -7,17 +7,20 @@ namespace Game.Core
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 
+        // Tuned with a small simulation (greedy upgrade buying, ~4 hits/s, workers spread over the plots):
+        // a full playthrough takes ~15 minutes with an attentive player, ~25 purchases, one every ~35 s.
+        // Work per floor is large on purpose; the HUD shows compact numbers (1.2K).
         public static readonly BuildPlan[] Plans =
         {
-            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 6,   completionBonus: 15),
-            new BuildPlan("Ev",        floors: 3,  workPerFloor: 25,  completionBonus: 60),
-            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 70,  completionBonus: 220),
-            new BuildPlan("Otel",      floors: 7,  workPerFloor: 170, completionBonus: 800),
-            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 420, completionBonus: 3000),
+            new BuildPlan("Kulübe",    floors: 2,  workPerFloor: 96,   completionBonus: 120),
+            new BuildPlan("Ev",        floors: 3,  workPerFloor: 400,  completionBonus: 480),
+            new BuildPlan("Apartman",  floors: 5,  workPerFloor: 1120, completionBonus: 1760),
+            new BuildPlan("Otel",      floors: 7,  workPerFloor: 2720, completionBonus: 6400),
+            new BuildPlan("Gökdelen",  floors: 10, workPerFloor: 6720, completionBonus: 24000),
         };
 
-        public static UpgradeTrack NewHammerTrack() => new UpgradeTrack(baseCost: 10, growth: 1.55, maxLevel: 25);
-        public static UpgradeTrack NewWorkerTrack() => new UpgradeTrack(baseCost: 40, growth: 1.7, maxLevel: MaxWorkers);
+        public static UpgradeTrack NewHammerTrack() => new UpgradeTrack(baseCost: 25, growth: 1.55, maxLevel: 25);
+        public static UpgradeTrack NewWorkerTrack() => new UpgradeTrack(baseCost: 120, growth: 1.8, maxLevel: MaxWorkers);
 
         /// <summary>Work (= coins) per hammer hit.</summary>
         public static int HammerPower(int hammerLevel) => 1 + hammerLevel;
