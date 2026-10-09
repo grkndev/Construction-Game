@@ -8,8 +8,8 @@ namespace Game.Core
     /// <summary>
     /// Command-line hooks for automated checks of a built player (no effect unless the flags are passed):
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
-    /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays by hammering the active plot
-    /// and buying upgrades, which exercises the whole loop without a human.
+    /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-shop</c> opens the shop panel; <c>-demo</c> auto-plays by standing next to the active plot (the
+    /// player hammers automatically, like in real play) and buying upgrades, which exercises the whole loop without a human.
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
     {
@@ -21,10 +21,12 @@ namespace Game.Core
             var args = Environment.GetCommandLineArgs();
             var shot = Arg(args, "-shot");
             var demo = Array.IndexOf(args, "-demo") >= 0;
+            var openShop = Array.IndexOf(args, "-shop") >= 0;
             if (shot == null && !demo) yield break;
             Application.runInBackground = true;   // automated runs must not stall when the window isn't focused
 
             if (demo) StartCoroutine(Demo());
+            if (openShop) game.ToggleShop();   // so a screenshot can show the shop panel
 
             if (shot == null) yield break;
             float.TryParse(Arg(args, "-shotDelay"), System.Globalization.NumberStyles.Float,
@@ -44,7 +46,8 @@ namespace Game.Core
 
         IEnumerator Demo()
         {
-            // Pretend to be a fast player: ~8 hits per second, upgrades bought whenever affordable, colas drunk when found.
+            // Pretend to be a fast player: walks (teleports) to the plot so the automatic hammer does the hitting,
+            // upgrades bought whenever affordable, colas drunk when found.
             var wait = new WaitForSeconds(0.12f);
             var elapsed = 0f;
             var boosted = false;
@@ -64,13 +67,27 @@ namespace Game.Core
                     if (candidate.State != Game.World.SiteState.Active) continue;
                     if (site == null || candidate.Plan.TotalWork < site.Plan.TotalWork) site = candidate;
                 }
-                if (site != null) game.TryHit(site, game.HammerPower, site.transform.position + Vector3.up, player);
+                if (site != null) StandNextTo(site);
                 game.BuyWorker();
                 game.BuyHammer();
                 game.BuyStamina();
                 game.UseCola();
                 yield return wait;
             }
+        }
+
+        // Puts the player a little in front of the plot (towards the island centre) so it is inside the work radius.
+        void StandNextTo(Game.World.BuildSite site)
+        {
+            var toCentre = -site.transform.position;
+            toCentre.y = 0f;
+            var spot = site.transform.position + toCentre.normalized * 2.5f;
+            if ((player.transform.position - spot).sqrMagnitude < 1f) return;
+
+            var controller = player.GetComponent<CharacterController>();
+            controller.enabled = false;
+            player.transform.position = new Vector3(spot.x, player.transform.position.y, spot.z);
+            controller.enabled = true;
         }
 
         static string Arg(string[] args, string name)

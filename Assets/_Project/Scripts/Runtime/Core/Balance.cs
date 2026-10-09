@@ -5,7 +5,7 @@ namespace Game.Core
     /// <summary>All tuning numbers in one place so the game can be balanced without hunting through code.</summary>
     public static class Balance
     {
-        public const float HitCooldown = 0.18f;          // seconds between hammer hits (hold = auto repeat)
+        public const float HitCooldown = 0.18f;          // seconds between the player's automatic hammer hits
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 

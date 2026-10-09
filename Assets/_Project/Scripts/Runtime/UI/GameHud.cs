@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace Game.UI
 {
-    /// <summary>Screen-space HUD: coins, current building, energy bar, cola, upgrade buttons, hints. It only reads game state and calls Buy*/Use*.</summary>
+    /// <summary>Screen-space HUD: coins, current building, energy bar, cola, shop button, hints. It only reads game state and calls Use*; purchases live in <see cref="ShopPanel"/>.</summary>
     public sealed class GameHud : MonoBehaviour
     {
         const float EnergyBarMinWidth = 140f;   // bar width at base capacity; it grows with stamina so the upgrade is visible
@@ -16,14 +16,8 @@ namespace Game.UI
         [SerializeField] UiPlate hintPlate;
         [SerializeField] UiPlate victoryPlate;
         [SerializeField] UiPlate boostPlate;
-        [SerializeField] Button hammerButton;
-        [SerializeField] TMP_Text hammerLabel;
-        [SerializeField] Button workerButton;
-        [SerializeField] TMP_Text workerLabel;
-        [SerializeField] Button staminaButton;
-        [SerializeField] TMP_Text staminaLabel;
-        [SerializeField] Button colaBuyButton;
-        [SerializeField] TMP_Text colaBuyLabel;
+        [SerializeField] ShopPanel shop;
+        [SerializeField] Button shopButton;
         [SerializeField] Button colaUseButton;
         [SerializeField] TMP_Text colaUseLabel;
         [SerializeField] TMP_Text playerEnergyLabel;
@@ -42,20 +36,17 @@ namespace Game.UI
         {
             game = controller;
             game.Economy.Changed += Refresh;
-            game.Hammer.Changed += Refresh;
-            game.Workers.Changed += Refresh;
-            game.Stamina.Changed += Refresh;
             game.StateChanged += Refresh;
             game.Hint += ShowHint;
 
-            hammerButton.onClick.AddListener(game.BuyHammer);
-            workerButton.onClick.AddListener(game.BuyWorker);
-            staminaButton.onClick.AddListener(game.BuyStamina);
-            colaBuyButton.onClick.AddListener(game.BuyCola);
+            shop.Bind(game);
+            shopButton.onClick.AddListener(shop.Toggle);
             colaUseButton.onClick.AddListener(game.UseCola);
             victoryPlate.Text = "";
 
-            ShowHint("WASD / sol çubuk: yürü    SPACE / tık / A: çekiç vur    İstediğin inşaata git!", 7f);
+            ShowHint(Application.isMobilePlatform
+                ? "Ekran çubuğuyla yürü    İnşaata yaklaşınca otomatik çalışırsın"
+                : "WASD: yürü    İnşaata yaklaşınca otomatik çalışırsın    Mağaza: B    Kola: E", 7f);
             Refresh();
         }
 
@@ -63,9 +54,6 @@ namespace Game.UI
         {
             if (game == null) return;
             game.Economy.Changed -= Refresh;
-            game.Hammer.Changed -= Refresh;
-            game.Workers.Changed -= Refresh;
-            game.Stamina.Changed -= Refresh;
             game.StateChanged -= Refresh;
             game.Hint -= ShowHint;
         }
@@ -120,27 +108,7 @@ namespace Game.UI
         {
             coinsText.text = NumberFormat.Compact(game.Economy.Coins);
 
-            hammerLabel.text = game.Hammer.IsMaxed
-                ? "ÇEKİÇ\nEn yüksek seviye"
-                : $"ÇEKİÇ  Sv.{game.Hammer.Level + 1}\nVuruş {game.BaseHammerPower} (+1)  •  {NumberFormat.Compact(game.Hammer.NextCost)}";
-            hammerButton.interactable = !game.Hammer.IsMaxed && game.Economy.CanAfford(game.Hammer.NextCost);
-
-            workerLabel.text = game.Workers.IsMaxed
-                ? $"İŞÇİ  {game.Workers.Level}\nEkip tamam"
-                : $"İŞÇİ AL  ({game.Workers.Level}/{Balance.MaxWorkers})\n{NumberFormat.Compact(game.Workers.NextCost)}";
-            workerButton.interactable = !game.Workers.IsMaxed && game.Economy.CanAfford(game.Workers.NextCost);
-
-            // Shows what the upgrade does in the unit the player feels: hits per full energy bar.
-            var now = Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level);
-            staminaLabel.text = game.Stamina.IsMaxed
-                ? $"DAYANIKLILIK\nEn yüksek • {now} vuruş"
-                : $"DAYANIKLILIK  Sv.{game.Stamina.Level + 1}\n{now} → {Balance.HitsPerBar(Balance.PlayerEnergy, game.Stamina.Level + 1)} vuruş  •  {NumberFormat.Compact(game.Stamina.NextCost)}";
-            staminaButton.interactable = !game.Stamina.IsMaxed && game.Economy.CanAfford(game.Stamina.NextCost);
-
-            colaBuyLabel.text = $"SARI KOLA\nEnerji + Coşku  •  {NumberFormat.Compact(game.ColaPrice)}";
-            colaBuyButton.interactable = game.Economy.CanAfford(game.ColaPrice);
-
-            colaUseLabel.text = $"Sarı Kola  x{game.ColaCount}   [E]";
+            colaUseLabel.text = $"Sarı Kola  x{game.ColaCount}";
             colaUseButton.interactable = game.ColaCount > 0;
 
             if (game.AllDone)

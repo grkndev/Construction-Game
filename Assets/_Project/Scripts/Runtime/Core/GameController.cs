@@ -52,6 +52,8 @@ namespace Game.Core
         /// <summary>Raised when something the HUD shows changes outside the economy: cola count, boost, plot finished.</summary>
         public event Action StateChanged;
         public event Action<string> Hint;
+        /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
+        public event Action ShopToggleRequested;
 
         int workersSpawned;
 
@@ -224,6 +226,8 @@ namespace Game.Core
             // Found at call time on purpose: workers are hired during play and no registry is needed.
             foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.Refill();
         }
+
+        public void ToggleShop() => ShopToggleRequested?.Invoke();
 
         public void ShowHint(string text) => Hint?.Invoke(text);
 

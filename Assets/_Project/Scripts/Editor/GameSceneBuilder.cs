@@ -7,6 +7,7 @@ using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.InputSystem.OnScreen;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
@@ -344,15 +345,17 @@ namespace Game.Editor
             var energyPanel = Panel(root, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -155f), new Vector2(380f, 84f));
             EnergyRow(energyPanel, rounded, font, "ENERJİ", -8f, out var energyLabel, out var energyBack, out var playerFill, out var playerFillImage);
 
-            var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(0f, 1f), new Vector2(40f, -255f), new Vector2(380f, 84f),
-                new Color(1f, 0.84f, 0.2f), 32, out var colaUseLabel);
+            // Bottom-right, where the right thumb rests: shop and the cola you carry.
+            var shopButton = TintedButton(root, "ShopButton", rounded, font, new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(300f, 100f),
+                new Color(1f, 0.79f, 0.24f), 36, out var shopLabel);
+            shopLabel.text = "MAĞAZA";
+            var colaUseButton = TintedButton(root, "ColaUseButton", rounded, font, new Vector2(1f, 0f), new Vector2(-40f, 160f), new Vector2(300f, 100f),
+                new Color(1f, 0.93f, 0.35f), 32, out var colaUseLabel);
 
             var boostPlate = TextPlate(root, "BoostPlate", rounded, font, outlineMat, 52, new Color(1f, 0.65f, 0.2f), new Vector2(0.5f, 1f), new Vector2(0f, -130f));
 
-            var hammerButton = UpgradeButton(root, "HammerButton", rounded, font, new Vector2(-645f, 50f), new Color(1f, 0.79f, 0.24f), out var hammerLabel);
-            var workerButton = UpgradeButton(root, "WorkerButton", rounded, font, new Vector2(-215f, 50f), new Color(0.45f, 0.82f, 1f), out var workerLabel);
-            var staminaButton = UpgradeButton(root, "StaminaButton", rounded, font, new Vector2(215f, 50f), new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
-            var colaBuyButton = UpgradeButton(root, "ColaBuyButton", rounded, font, new Vector2(645f, 50f), new Color(1f, 0.55f, 0.3f), out var colaBuyLabel);
+            var shop = BuildShop(root, rounded, font);
+            BuildTouchControls(root, knob);
 
             var hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "coinsText", coinsText);
@@ -360,14 +363,8 @@ namespace Game.Editor
             EditorWire.Set(hud, "hintPlate", hintPlate);
             EditorWire.Set(hud, "victoryPlate", victoryPlate);
             EditorWire.Set(hud, "boostPlate", boostPlate);
-            EditorWire.Set(hud, "hammerButton", hammerButton);
-            EditorWire.Set(hud, "hammerLabel", hammerLabel);
-            EditorWire.Set(hud, "workerButton", workerButton);
-            EditorWire.Set(hud, "workerLabel", workerLabel);
-            EditorWire.Set(hud, "staminaButton", staminaButton);
-            EditorWire.Set(hud, "staminaLabel", staminaLabel);
-            EditorWire.Set(hud, "colaBuyButton", colaBuyButton);
-            EditorWire.Set(hud, "colaBuyLabel", colaBuyLabel);
+            EditorWire.Set(hud, "shop", shop);
+            EditorWire.Set(hud, "shopButton", shopButton);
             EditorWire.Set(hud, "colaUseButton", colaUseButton);
             EditorWire.Set(hud, "colaUseLabel", colaUseLabel);
             EditorWire.Set(hud, "playerEnergyLabel", energyLabel);
@@ -426,11 +423,72 @@ namespace Game.Editor
             return tmp;
         }
 
-        static Button UpgradeButton(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Vector2 pos, Color tint, out TMP_Text label)
+        // Side panel with the four purchases. The ShopPanel component sits on an always-active empty object so it can
+        // keep sliding the (otherwise inactive) panel in and out.
+        static ShopPanel BuildShop(Transform root, Sprite rounded, TMP_FontAsset font)
         {
-            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 0f), pos, new Vector2(410f, 140f), tint, 30, out label);
+            var host = Rect(root, "Shop", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            var shop = host.gameObject.AddComponent<ShopPanel>();
+
+            var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -40f), new Vector2(520f, 720f));
+            var back = panelRt.gameObject.AddComponent<Image>();
+            back.sprite = rounded;
+            back.type = Image.Type.Sliced;
+            back.color = PanelColor;
+
+            var title = Label(panelRt, "Title", font, null, 40, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 1f), new Vector2(28f, -20f), new Vector2(300f, 56f));
+            title.text = "MAĞAZA";
+            var close = TintedButton(panelRt, "CloseButton", rounded, font, new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(64f, 64f),
+                new Color(1f, 0.45f, 0.4f), 36, out var closeLabel);
+            closeLabel.text = "X";
+
+            var hammer = ShopCard(panelRt, "HammerButton", rounded, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
+            var worker = ShopCard(panelRt, "WorkerButton", rounded, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            var stamina = ShopCard(panelRt, "StaminaButton", rounded, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
+            var cola = ShopCard(panelRt, "ColaBuyButton", rounded, font, 3, new Color(1f, 0.55f, 0.3f), out var colaLabel);
+
+            EditorWire.Set(shop, "panel", panelRt);
+            EditorWire.Set(shop, "closeButton", close);
+            EditorWire.Set(shop, "hammerButton", hammer);
+            EditorWire.Set(shop, "hammerLabel", hammerLabel);
+            EditorWire.Set(shop, "workerButton", worker);
+            EditorWire.Set(shop, "workerLabel", workerLabel);
+            EditorWire.Set(shop, "staminaButton", stamina);
+            EditorWire.Set(shop, "staminaLabel", staminaLabel);
+            EditorWire.Set(shop, "colaBuyButton", cola);
+            EditorWire.Set(shop, "colaBuyLabel", colaLabel);
+            panelRt.gameObject.SetActive(false);
+            return shop;
+        }
+
+        static Button ShopCard(Transform parent, string name, Sprite sprite, TMP_FontAsset font, int row, Color tint, out TMP_Text label)
+        {
+            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 1f), new Vector2(0f, -98f - row * 150f), new Vector2(472f, 136f), tint, 30, out label);
             label.textWrappingMode = TextWrappingModes.Normal;
             return button;
+        }
+
+        // On-screen joystick for touch devices. Everything is parented to a centre-anchored root because OnScreenStick
+        // measures in canvas space (origin at the canvas centre). The stick appears wherever the thumb lands inside its zone.
+        static void BuildTouchControls(Transform root, Sprite knob)
+        {
+            var joystick = Rect(root, "Joystick", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var zone = new Vector2(-690f, -270f);
+
+            var ring = MakeImage(joystick, "Zone", knob, new Color(1f, 1f, 1f, 0.12f), new Vector2(0.5f, 0.5f), zone, new Vector2(300f, 300f));
+            ring.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+
+            var handleImage = MakeImage(joystick, "Handle", knob, new Color(1f, 1f, 1f, 0.55f), new Vector2(0.5f, 0.5f), zone, new Vector2(120f, 120f));
+            handleImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var stick = handleImage.gameObject.AddComponent<OnScreenStick>();
+            EditorWire.SetString(stick, "m_ControlPath", "<Gamepad>/leftStick");
+            EditorWire.SetFloat(stick, "m_MovementRange", 100f);
+            EditorWire.SetFloat(stick, "m_DynamicOriginRange", 230f);
+            EditorWire.SetInt(stick, "m_Behaviour", (int)OnScreenStick.Behaviour.ExactPositionWithDynamicOrigin);
+
+            var controls = root.gameObject.AddComponent<TouchControls>();
+            EditorWire.Set(controls, "joystick", joystick.gameObject);
+            joystick.gameObject.SetActive(false);   // TouchControls turns it on for touch devices
         }
 
         static Button TintedButton(Transform parent, string name, Sprite sprite, TMP_FontAsset font, Vector2 anchor, Vector2 pos,
