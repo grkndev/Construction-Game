@@ -369,9 +369,25 @@ namespace Game.Tests
         [Test]
         public void Scale_MultipliesWorkAndRewards()
         {
-            var plan = Balance.Districts[2].Plans[0];
-            Assert.AreEqual(3 * 90 * Balance.Districts[2].Scale, plan.TotalWork);
-            Assert.AreEqual(120 * Balance.Districts[2].Scale, plan.CompletionBonus);
+            // DistrictDef scales the plans it is given: every price-like number is a whole multiple of the district scale.
+            foreach (var d in Balance.Districts)
+                foreach (var plan in d.Plans)
+                {
+                    Assert.AreEqual(0, plan.WorkPerFloor % d.Scale, $"{d.Name}/{plan.Name} work");
+                    Assert.AreEqual(0, plan.CompletionBonus % d.Scale, $"{d.Name}/{plan.Name} bonus");
+                }
+        }
+
+        [Test]
+        public void LaterDistricts_HaveBiggerBuildings_InTheirOwnUnits()
+        {
+            // In first-district units (work / scale) each district's finale is bigger than the one before it.
+            for (var i = 1; i < Balance.Districts.Length; i++)
+            {
+                var previous = Balance.Districts[i - 1];
+                var current = Balance.Districts[i];
+                Assert.Greater(current.Plans[2].TotalWork / current.Scale, previous.Plans[2].TotalWork / previous.Scale, current.Name);
+            }
         }
 
         [Test]

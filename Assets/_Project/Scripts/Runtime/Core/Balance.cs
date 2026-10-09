@@ -9,31 +9,33 @@ namespace Game.Core
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 
-        // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale),
-        // with its own upgrades. Plan numbers below are first-district numbers; DistrictDef scales them.
-        // Provisional: Stage 5 re-tunes these with tools/balance_sim.py.
+        // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
+        // district for prices, hit power, work and rewards) with its own upgrades, and later districts also have bigger buildings
+        // (the numbers below are first-district shapes times a per-district size: x1, 2.6, 5.2, 9, 13), so they take longer.
+        // Tuned with tools/balance_sim.py (attentive player): about 2.5 / 4.2 / 6.2 / 9 / 12 minutes per district, 34 in all;
+        // real play is ~25% slower, so expect roughly 40-45 minutes for the whole city.
         public static readonly DistrictDef[] Districts =
         {
             new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
-                new BuildPlan("Kulübe",         3, 90,  120,  xp: 1),
-                new BuildPlan("Balıkçı Evi",    4, 300, 420,  xp: 2),
-                new BuildPlan("Pansiyon",       6, 800, 1300, xp: 3)),
+                new BuildPlan("Kulübe",         3, 90,   120,   xp: 1),
+                new BuildPlan("Balıkçı Evi",    4, 300,  420,   xp: 2),
+                new BuildPlan("Pansiyon",       6, 800,  1300,  xp: 3)),
             new DistrictDef("Merkez", requiredLevel: 3, scale: 4,
-                new BuildPlan("Dükkan",         3, 90,  120,  xp: 2),
-                new BuildPlan("Kafe",           4, 300, 420,  xp: 3),
-                new BuildPlan("Belediye",       6, 800, 1300, xp: 4)),
+                new BuildPlan("Dükkan",         3, 234,  312,   xp: 2),
+                new BuildPlan("Kafe",           4, 780,  1092,  xp: 3),
+                new BuildPlan("Belediye",       6, 2080, 3380,  xp: 4)),
             new DistrictDef("Liman",  requiredLevel: 5, scale: 16,
-                new BuildPlan("Depo",           3, 90,  120,  xp: 3),
-                new BuildPlan("Lokanta",        4, 300, 420,  xp: 4),
-                new BuildPlan("Gümrük",         6, 800, 1300, xp: 6)),
+                new BuildPlan("Depo",           3, 468,  624,   xp: 3),
+                new BuildPlan("Lokanta",        4, 1560, 2184,  xp: 4),
+                new BuildPlan("Gümrük",         6, 4160, 6760,  xp: 6)),
             new DistrictDef("Tepe",   requiredLevel: 7, scale: 64,
-                new BuildPlan("Değirmen",       3, 90,  120,  xp: 4),
-                new BuildPlan("Çiftlik Evi",    4, 300, 420,  xp: 5),
-                new BuildPlan("Fener",          6, 800, 1300, xp: 7)),
+                new BuildPlan("Değirmen",       3, 810,  1080,  xp: 4),
+                new BuildPlan("Çiftlik Evi",    4, 2700, 3780,  xp: 5),
+                new BuildPlan("Fener",          6, 7200, 11700, xp: 7)),
             new DistrictDef("Sanayi", requiredLevel: 9, scale: 256,
-                new BuildPlan("Atölye",         3, 90,  120,  xp: 5),
-                new BuildPlan("Fabrika",        4, 300, 420,  xp: 6),
-                new BuildPlan("Baca Kulesi",    6, 800, 1300, xp: 8)),
+                new BuildPlan("Atölye",         3, 1170, 1560,  xp: 5),
+                new BuildPlan("Fabrika",        4, 3900, 5460,  xp: 6),
+                new BuildPlan("Baca Kulesi",    6, 10400, 16900, xp: 8)),
         };
 
         /// <summary>Total XP needed to reach level i + 1 (so index 0 is level 1 = 0 XP).</summary>

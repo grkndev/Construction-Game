@@ -7,14 +7,16 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Proje kökü: `/Volumes/ExternalSSD/Unity/Projects/Construction`. Geliştirme makinesi MacBook Air M4, Windows erişimi yok.
 
 ## Oyun
-- Küçük bir adada 5 inşaat alanı (plot). İşçiyi WASD / sol çubukla gezdir, aktif alanda **Space / sol tık / gamepad A** ile çekiç vur.
-- Her vuruş = ilerleme + o kadar para. Bina kat kat yükselir, bitince bonus ve konfeti. Sıradaki plot açılır.
-- 5 plotun hepsi baştan açık; oyuncu menzildeki en yakın plota vurur, işçiler en az işçisi olan plota dağılır.
-- **Enerji:** her karakterin (oyuncu ve her işçi) kendi enerjisi var, kafasının üstündeki barda görünür (oyuncununki ayrıca HUD'da). Vuruş enerji harcar, durunca dolar; bitince %40'a dolana kadar o karakter bekler. Plotların enerjisi yok. Bunun kodu `World/Character.cs` (yeni karakter türü = bu bileşeni eklemek).
-- Dayanıklılık etkisi **görünür** olmalı: HUD enerji çubuğu kapasiteyle uzar, sayıyla yazar, buton "25 → 30 vuruş" gösterir (`Balance.HitsPerBar`), karakter çubukları da uzar.
-- **Sarı Kola:** adada rastgele belirir, üstünden geçince cebe girer (en çok 3), **E / gamepad X** ile içilir → **tüm karakterlerin** enerjisi dolar ve 10 sn boyunca vuruş gücü "seviye +5" gibi hesaplanır (ayaklarında altın halka). Parayla alınan kola hemen içilir ve 15 sn **Coşku** verir: aynı +5 seviye, ayrıca herkes ×1.5 hızlı yürür/vurur ve kimse enerji harcamaz.
-- Parayla: **Çekiç** (vuruş gücü), **İşçi** (otomatik çalışan yardımcı, en çok 8), **Dayanıklılık** (tüm karakterlerin enerji kapasitesi +%15 ve yenilenme +%10 / seviye, en çok 10) ve **Sarı Kola**.
-- 5 bina bitince "Şehir tamamlandı" görünür.
+- Mobil (yatay) + web hedefli casual inşaat oyunu. Hikaye: fırtına Çekiçköy'ü yıktı, işçi köyü yeniden kuruyor. Metinler tek tabloda: `Core/StoryBeats.cs`.
+- **Dashboard** (ana ekran): ada yukarıdan görünür, 5 mahalle kartı (Sahil, Merkez, Liman, Tepe, Sanayi; ilerleme %, kilit + gereken seviye, "N sorun"), sol üstte para + seviye, ortada dünya adı + oklar (şimdilik tek dünya, sağ ok "yakında"). Karta dokununca o mahalleye girilir; **HARİTA** butonu geri döner. Aynı anda tek mahalle yüklü/aktif; mahalleler arası yürüme yok.
+- Her mahallede 3 bina. **Vuruş tamamen otomatik** (PC/mobil/web): oyuncu menzildeki en yakın binaya kendiliğinden vurur (`PlayerHammer`), işçiler de. Hareket: WASD / gamepad / mobilde ekran çubuğu (`OnScreenStick`, dokunmatikte `TouchControls` açar).
+- Her vuruş = ilerleme + o kadar para. Biten bina bonus + konfeti + **XP** verir; XP **seviye** yapar, seviye mahalle kilidini açar (`Balance.LevelThresholds`, `DistrictDef.RequiredLevel`: 1/3/5/7/9). 5 mahalle bitince "Şehir tamamlandı".
+- **Enerji:** her karakterin (oyuncu ve her işçi) kendi enerjisi var, kafasının üstündeki barda görünür (oyuncununki ayrıca HUD'da). Vuruş enerji harcar, durunca dolar; bitince %40'a dolana kadar o karakter bekler. Bunun kodu `World/Character.cs` (yeni karakter türü = bu bileşeni eklemek).
+- Dayanıklılık etkisi **görünür** olmalı: HUD enerji çubuğu kapasiteyle uzar, sayıyla yazar, mağaza kartı "25 → 30 vuruş" gösterir (`Balance.HitsPerBar`), karakter çubukları da uzar.
+- **Mağaza** (sadece mahalle içinde, **oyunu durdurmaz**): sağdan kayan panel (`UI/ShopPanel.cs`, kısayol B / gamepad Y). **Çekiç** (vuruş gücü), **İşçi** (en çok 8), **Dayanıklılık** (enerji kapasitesi +%20, yenilenme +%15 / seviye, en çok 10), **Sarı Kola**. Çekiç/İşçi/Dayanıklılık **mahalleye özeldir** (her mahalle sıfırdan başlar, `DistrictState`); para ve kola envanteri ortaktır. İşçiler yalnızca açık mahallede çalışır.
+- **Sarı Kola:** mahallede rastgele belirir, üstünden geçince cebe girer (en çok 3), HUD'daki butonla (E / gamepad X) içilir → açık mahalledeki **tüm karakterlerin** enerjisi dolar ve 10 sn boyunca vuruş gücü "seviye +5" gibi hesaplanır. Parayla alınan kola hemen içilir ve 15 sn **Coşku** verir: aynı +5 seviye, ayrıca herkes ×1.5 hızlı ve kimse enerji harcamaz.
+- **Sakinler ve onarım:** biten binaya bir sakin taşınır (`World/Resident.cs`). Yaklaşık 25 dk'da bir biten bir binada sorun çıkar (bina başı 1, mahalle başı en çok 3; uzakta geçen süre de sayılır ama birikmez). Sorunlu bina otomatik vuruşla onarılır → para + XP + teşekkür. **Ceza yok**: bozuk bina gelir kaybettirmez (`Core/RepairSchedule.cs`).
+- **Kayıt:** `save.json` (`Core/SaveStore.cs`, `Application.persistentDataPath`); bina bitince, her 30 sn, mahalleden çıkınca, uygulama arka plana gidince yazılır. Çevrimdışı kazanç yok.
 
 ## Görsel stil
 - Primitive'lerden üretilmiş, düz parlak renkler; kendi yazdığımız **toon shader** (`Art/Shaders/Toon.shader`: bantlı ışık, mor gölge tonu, ters-hull outline).
@@ -28,12 +30,14 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - `scripts/compile.sh` — derle. `scripts/test.sh` — EditMode testleri.
 - `scripts/build.sh mac|web` — build (`mac fast` = Mono, sadece hızlı görsel kontrol). `win` yazılı ama Windows modülü kurulu değil, denenmedi.
 - Loglar `Logs/` altında; `error CS` ya da hata kodu varsa script ≠ 0 döner.
-- Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [-demo]` (oyunun kendi karesini yazar, `-demo` otomatik oynar). Masaüstü ekran görüntüsü alma.
+- Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [bayraklar]` (oyunun kendi karesini yazar; **`-nographics` kullanma**, kare bozuk çıkar; log için `-logFile`). Masaüstü ekran görüntüsü alma. Bayraklar (`Core/DevCommands.cs`): `-demo` otomatik oynar (mahalleleri sırayla gezer), `-enter N` mahalle aç, `-xp N`/`-coins N` ver, `-finish N` mahalleyi bitir, `-break N` iki binayı boz, `-shop` mağazayı aç, `-speed N` hızlandır (yüksek hızda kare süresi sınırı yüzünden vuruş sayısı bozulur, süre ölçmek için kullanma), `-reset` kaydı sil. `-demo` ve `-shot` gerçek kayda dokunmaz (test için `-persist`).
+- Dengeyi `python3 tools/balance_sim.py` ile kontrol et (5 mahalle, her birinde yükseltmeler sıfırdan). Hedef: model ~34 dk, gerçek oyun ~40-45 dk.
 
 ## Mimari
-- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan, BuildProgress, EnergyMeter, BoostTimer, Balance) — **birim testli**, MonoBehaviour yok. Denge sayıları sadece `Balance.cs`'te; değiştirirken `python3 tools/balance_sim.py` ile (enerjiyi de modeller) toplam süreyi kontrol et: enerji oyunu ~2.4x yavaşlatır.
-- `GameController` sahnenin kompozisyon kökü; singleton yok, referanslar sahnede `EditorWire` ile bağlanır.
-- `Player/`, `World/`, `UI/` MonoBehaviour katmanı. Yeni içerik (bina) = `Balance.Plans`'e satır.
+- `Core/` düz C# mantık (Economy, UpgradeTrack, BuildPlan/BuildProgress, DistrictDef/DistrictState, LevelTrack, RepairSchedule, SaveData/SaveStore, EnergyMeter, BoostTimer, StoryBeats, Balance) — **birim testli**, oyun mantığı MonoBehaviour'da değil. Denge sayıları sadece `Balance.cs`'te; değiştirirken `tools/balance_sim.py` ile toplam süreyi kontrol et (enerji oyunu ~2.4x yavaşlatır).
+- `DistrictDef.Scale`: her mahalle birincisinin aynısı ama para/iş/fiyat/vuruş gücü `Scale` kat büyük (x4/mahalle); sonraki mahallelerde binalar ayrıca daha büyük (`Balance.Districts`'teki sayılar).
+- `GameController` sahnenin kompozisyon kökü (modlar: Dashboard / InDistrict, kayıt, seviye, mağaza işlemleri); singleton yok, referanslar sahnede `EditorWire` ile bağlanır. Tek sahne (`Main.unity`): her mahalle ayrı kök GameObject (`District`), dashboard hepsini açar, mahalle ziyareti sadece birini.
+- `Player/`, `World/`, `UI/` MonoBehaviour katmanı (`GameHud` mahalle içi, `DashboardHud` harita, `ShopPanel`). Yeni içerik: yeni bina = `Balance.Districts[..]`'e `BuildPlan`; yeni mahalle = `Balance.Districts` + `GameSceneBuilder.BuildDistrict`/`BuildLandmark`; yeni dünya = ileride `MapDefinition` (kayıtta `mapId` hazır).
 - Tween için DOTween yok (OpenUPM'den kalkmış); `Easing.cs` + Update tabanlı animasyonlar.
 
 ## Çalışma kuralları
@@ -43,4 +47,4 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Dosya yolu: yalnızca `Application.persistentDataPath` + `Path.Combine`. Thread yok (WebGL).
 - Hazır asset eklenince `CREDITS.md`'ye işle.
 - Commit: conventional commits, küçük ve anlamlı.
-- Mac IL2CPP + WebGL ana hedefler; Windows (Mono) sonra.
+- Mac IL2CPP + WebGL ana hedefler; Windows (Mono) sonra. iOS/Android modülleri kurulu değil; dokunmatik kontrol WebGL build'i telefon tarayıcısında açarak denenir.
