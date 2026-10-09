@@ -15,7 +15,7 @@ namespace Game.Tests
         [Test]
         public void RuntimeAssembly_IsWiredIntoTestAssembly()
         {
-            Assert.AreEqual("Game.Runtime", typeof(Bootstrap).Assembly.GetName().Name);
+            Assert.AreEqual("Game.Runtime", typeof(Economy).Assembly.GetName().Name);
         }
 
         [Test]
@@ -37,10 +37,16 @@ namespace Game.Tests
         }
 
         [Test]
-        public void BuildSettings_StartWithBootstrapThenPlayground()
+        public void BuildSettings_ContainOnlyTheMainScene()
         {
             var paths = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
-            CollectionAssert.AreEqual(new[] { SceneBuilders.BootstrapPath, SceneBuilders.PlaygroundPath }, paths);
+            CollectionAssert.AreEqual(new[] { GameSceneBuilder.ScenePath }, paths);
+        }
+
+        [Test]
+        public void MainScene_Exists()
+        {
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<SceneAsset>(GameSceneBuilder.ScenePath));
         }
     }
 }

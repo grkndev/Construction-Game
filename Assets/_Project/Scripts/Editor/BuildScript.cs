@@ -77,8 +77,10 @@ namespace Game.Editor
             switch (target)
             {
                 case BuildTarget.StandaloneOSX:
-                    // macOS: IL2CPP, Universal (Intel + Apple Silicon).
-                    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, ScriptingImplementation.IL2CPP);
+                    // macOS: IL2CPP, Universal (Intel + Apple Silicon). "-mono" is a ~5x faster build for quick
+                    // visual checks only; release builds must not pass it.
+                    var fast = Array.IndexOf(Environment.GetCommandLineArgs(), "-mono") >= 0;
+                    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Standalone, fast ? ScriptingImplementation.Mono2x : ScriptingImplementation.IL2CPP);
                     UnityEditor.OSXStandalone.UserBuildSettings.architecture = OSArchitecture.x64ARM64;
                     break;
                 case BuildTarget.StandaloneWindows64:

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c64cfe559e684fc2bbc59585f035ce0, type: 3}
+  m_Name: ToonPalette
+  m_EditorClassIdentifier: Game.Runtime::Game.World.ToonPalette
+  grass: {fileID: 2100000, guid: 6e1bf38dc662b4bfa81cd082fadbfaaf, type: 2}
+  dirt: {fileID: 2100000, guid: 12ba3d87300414aed880f892af166bef, type: 2}
+  sea: {fileID: 2100000, guid: 421c04698c27149f58d0e4f55c6576de, type: 2}
+  trunk: {fileID: 2100000, guid: 1536c4febdc4246dcb9e3a3a802c88d1, type: 2}
+  leaves: {fileID: 2100000, guid: bbb5776a7ecc34b478fdff6ecc20fc33, type: 2}
+  crate: {fileID: 2100000, guid: 3a7dc6d3c10af49c5931c678a7ebd384, type: 2}
+  cone: {fileID: 2100000, guid: 33f25b61a16c84f89a3bbd0b6b0361c7, type: 2}
+  stone: {fileID: 2100000, guid: 91f8ee61fd70f4483bf9706f9c3f126c, type: 2}
+  walls:
+  - {fileID: 2100000, guid: 80d628ea93d6e4ae48ae939b3a4fe559, type: 2}
+  - {fileID: 2100000, guid: 444ec8f08e5534fb2a90cb5861c5ebc9, type: 2}
+  - {fileID: 2100000, guid: 44502697685d24654844fe4568f05dc8, type: 2}
+  - {fileID: 2100000, guid: 229314ec126e24944ba07f5c8761bca5, type: 2}
+  - {fileID: 2100000, guid: 3ee024959e3da47b880958ae4a701156, type: 2}
+  roof: {fileID: 2100000, guid: 8f8441bca3dbf49ed8d778925c6324f6, type: 2}
+  window: {fileID: 2100000, guid: a869300118ce74c44a2dd01c4ea38f98, type: 2}
+  door: {fileID: 2100000, guid: 4656dc927c46e4d4bb04e530c91f6799, type: 2}
+  scaffold: {fileID: 2100000, guid: 29c767fbd78b3437bb679c5b867b80ed, type: 2}
+  flag: {fileID: 2100000, guid: cc09a84f54c084c8ab03517f289e5772, type: 2}
+  skin: {fileID: 2100000, guid: be21a766d085643bd8d0d21d2330b051, type: 2}
+  hat: {fileID: 2100000, guid: 96237fecb485f4af79cf225054a2d9b5, type: 2}
+  shirt: {fileID: 2100000, guid: 99bce3fc9748b432a8565c792a9cf546, type: 2}
+  shirtHelper: {fileID: 2100000, guid: f2f3719217de6470d9e488e4decc94d5, type: 2}
+  hammerHandle: {fileID: 2100000, guid: 3d9e213f2e86a4c3ebed410a4647faa0, type: 2}
+  hammerHead: {fileID: 2100000, guid: 75a088aae6c6d4a12a050ac0dc94ac80, type: 2}
+  eye: {fileID: 2100000, guid: ff2451ca9ed2b4deb831b37bfac12f77, type: 2}
+  barBack: {fileID: 2100000, guid: b84c9003cb6944839bd92aaa2d6b682e, type: 2}
+  barFill: {fileID: 2100000, guid: cda700fc376f54377914269f475d77f6, type: 2}
+  marker: {fileID: 2100000, guid: 2510e37dd7a2642d78eee9ff771cf719, type: 2}

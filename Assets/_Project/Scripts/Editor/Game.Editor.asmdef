@@ -2,7 +2,10 @@
     "name": "Game.Editor",
     "rootNamespace": "Game.Editor",
     "references": [
-        "Game.Runtime"
+        "Game.Runtime",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"
