@@ -24,6 +24,13 @@ namespace Game.Core
             this.maxLevel = maxLevel;
         }
 
+        /// <summary>Restores a saved level (clamped to the valid range).</summary>
+        public void SetLevel(int level)
+        {
+            Level = Math.Max(0, Math.Min(level, maxLevel));
+            Changed?.Invoke();
+        }
+
         public bool TryBuy(Economy economy)
         {
             if (IsMaxed || !economy.TrySpend(NextCost)) return false;

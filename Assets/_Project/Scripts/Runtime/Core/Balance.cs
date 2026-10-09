@@ -9,6 +9,45 @@ namespace Game.Core
         public const float WorkerHitInterval = 1.1f;     // seconds between an auto-worker's hits
         public const int MaxWorkers = 8;
 
+        // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale),
+        // with its own upgrades. Plan numbers below are first-district numbers; DistrictDef scales them.
+        // Provisional: Stage 5 re-tunes these with tools/balance_sim.py.
+        public static readonly DistrictDef[] Districts =
+        {
+            new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
+                new BuildPlan("Kulübe",         3, 90,  120,  xp: 1),
+                new BuildPlan("Balıkçı Evi",    4, 300, 420,  xp: 2),
+                new BuildPlan("Pansiyon",       6, 800, 1300, xp: 3)),
+            new DistrictDef("Merkez", requiredLevel: 3, scale: 4,
+                new BuildPlan("Dükkan",         3, 90,  120,  xp: 2),
+                new BuildPlan("Kafe",           4, 300, 420,  xp: 3),
+                new BuildPlan("Belediye",       6, 800, 1300, xp: 4)),
+            new DistrictDef("Liman",  requiredLevel: 5, scale: 16,
+                new BuildPlan("Depo",           3, 90,  120,  xp: 3),
+                new BuildPlan("Lokanta",        4, 300, 420,  xp: 4),
+                new BuildPlan("Gümrük",         6, 800, 1300, xp: 6)),
+            new DistrictDef("Tepe",   requiredLevel: 7, scale: 64,
+                new BuildPlan("Değirmen",       3, 90,  120,  xp: 4),
+                new BuildPlan("Çiftlik Evi",    4, 300, 420,  xp: 5),
+                new BuildPlan("Fener",          6, 800, 1300, xp: 7)),
+            new DistrictDef("Sanayi", requiredLevel: 9, scale: 256,
+                new BuildPlan("Atölye",         3, 90,  120,  xp: 5),
+                new BuildPlan("Fabrika",        4, 300, 420,  xp: 6),
+                new BuildPlan("Baca Kulesi",    6, 800, 1300, xp: 8)),
+        };
+
+        /// <summary>Total XP needed to reach level i + 1 (so index 0 is level 1 = 0 XP).</summary>
+        public static readonly int[] LevelThresholds = { 0, 2, 5, 8, 12, 17, 23, 30, 38, 47 };
+
+        // ---- Repairs: finished buildings sometimes get a problem. No penalty, fixing it pays a bonus.
+        public const float RepairInterval = 1500f;       // seconds (25 min) between problems in a district
+        public const int MaxIssuesPerDistrict = 3;
+        public const int RepairKinds = 4;                // roof leak, broken pipe, bad wiring, cracked wall
+        public static int RepairWork(int scale) => 40 * scale;
+        public static int RepairReward(int scale) => 60 * scale;
+        public const int RepairXp = 1;
+
+        // Legacy single-island plots; the scene still uses them until the districts land in Stage 3.
         // Tuned with tools/balance_sim.py (energy, stamina upgrades and the cola level bonus included, greedy upgrade
         // buying, ~5.5 hits/s when allowed, a free cola every ~45 s): an attentive player finishes the buildings at
         // roughly 0.3 / 0.8 / 1.9 / 4.0 / 8.0 minutes. Real play is slower than the model: expect 10-12 minutes.
@@ -34,7 +73,7 @@ namespace Game.Core
         const float StaminaMaxPerLevel = 0.20f;
         const float StaminaRegenPerLevel = 0.15f;
 
-        public static UpgradeTrack NewStaminaTrack() => new UpgradeTrack(baseCost: 60, growth: 1.6, maxLevel: MaxStaminaLevel);
+        public static UpgradeTrack NewStaminaTrack(int scale = 1) => new UpgradeTrack(baseCost: 60L * scale, growth: 1.6, maxLevel: MaxStaminaLevel);
 
         /// <summary>How many hits one full bar pays for at a stamina level; the unit the player actually feels.</summary>
         public static int HitsPerBar(EnergySettings s, int level) => (int)(WithStamina(s, level).Max / s.Cost);
@@ -60,8 +99,8 @@ namespace Game.Core
         /// <summary>Scales with the hammer so it stays a real decision as income grows (60 at start, ~1100 at level 14).</summary>
         public static long ColaPrice(int hammerLevel) => 60 + (long)Math.Round(35 * Math.Pow(hammerLevel, 1.3));
 
-        public static UpgradeTrack NewHammerTrack() => new UpgradeTrack(baseCost: 20, growth: 1.5, maxLevel: 25);
-        public static UpgradeTrack NewWorkerTrack() => new UpgradeTrack(baseCost: 90, growth: 1.75, maxLevel: MaxWorkers);
+        public static UpgradeTrack NewHammerTrack(int scale = 1) => new UpgradeTrack(baseCost: 20L * scale, growth: 1.5, maxLevel: 25);
+        public static UpgradeTrack NewWorkerTrack(int scale = 1) => new UpgradeTrack(baseCost: 90L * scale, growth: 1.75, maxLevel: MaxWorkers);
 
         /// <summary>Work (= coins) per hammer hit.</summary>
         public static int HammerPower(int hammerLevel) => 1 + hammerLevel;
