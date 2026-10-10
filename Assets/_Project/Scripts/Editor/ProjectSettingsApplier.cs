@@ -34,6 +34,7 @@ namespace Game.Editor
             }
 
             ApplyWindow();
+            ApplyShadows();
 
             if (GetActiveInputHandler() != InputSystemOnly)
             {
@@ -44,6 +45,50 @@ namespace Game.Editor
                 // The Unity backend only switches handlers after a domain restart / editor restart.
                 Debug.LogWarning("[Settings] Active Input Handling -> Input System Package. Restart the editor for it to take effect.");
             }
+        }
+
+        // URP measures the shadow distance from the camera (not from the player), and the follow camera sits ~48 units out with the far
+        // half of the screen reaching ~100 units, so the default 50 cut the shadows off before the middle of the screen. The pipeline
+        // assets, not QualitySettings, are what URP reads.
+        public const float ShadowDistance = 150f;
+        static readonly string[] PipelineAssets = { "Assets/Settings/PC_RPAsset.asset", "Assets/Settings/Mobile_RPAsset.asset" };
+
+        static void ApplyShadows()
+        {
+            foreach (var path in PipelineAssets)
+            {
+                var asset = AssetDatabase.LoadMainAssetAtPath(path);
+                if (asset == null) continue;
+                var so = new SerializedObject(asset);
+                var mobile = path.Contains("Mobile");
+                var changed = SetFloat(so, "m_ShadowDistance", ShadowDistance);
+                // Spread over a longer distance the maps must stay sharp: PC keeps its 4 cascades, mobile gets 2 at a higher resolution.
+                if (mobile)
+                {
+                    changed |= SetInt(so, "m_ShadowCascadeCount", 2);
+                    changed |= SetInt(so, "m_MainLightShadowmapResolution", 2048);
+                }
+                if (!changed) continue;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                AssetDatabase.SaveAssets();
+                Debug.Log($"[Settings] {path}: shadow distance {ShadowDistance}");
+            }
+        }
+
+        static bool SetFloat(SerializedObject so, string name, float value)
+        {
+            var property = so.FindProperty(name);
+            if (property == null || Mathf.Approximately(property.floatValue, value)) return false;
+            property.floatValue = value;
+            return true;
+        }
+
+        static bool SetInt(SerializedObject so, string name, int value)
+        {
+            var property = so.FindProperty(name);
+            if (property == null || property.intValue == value) return false;
+            property.intValue = value;
+            return true;
         }
 
         static void ApplyWindow()
