@@ -23,6 +23,7 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - Primitive'lerden üretilmiş, düz parlak renkler; kendi yazdığımız **toon shader** (`Art/Shaders/Toon.shader`: bantlı ışık, mor gölge tonu, ters-hull outline).
 - Her materyal `ArtBuilder` ile üretilir, hepsi `Data/ToonPalette.asset` içinde toplanır. Yeni renk = `ArtBuilder.BuildPalette`.
 - Font: Paytone One (OFL, Türkçe karakterleri tam). UI: TextMeshPro + UGUI, 1920x1080 referans, match 0.5. Ekran yazıları `UiPlate` (yarı saydam siyah zemin, yazıyla büyür); paneller/butonlar `UI/Panel.png` (hafif köşeli dikdörtgen, 9-slice).
+- **HUD kiti** kendi üretimimiz (`Editor/UiKitBuilder.cs` → `Assets/_Project/UI/Kit/*.png`: Panel, Button, BarBack, BarFill, Coin, Star, Bolt; dış asset/lisans yok). Sprite'lar beyaza yakın, rengi sahne builder'da tint ile verilir. Çizimi değiştirince PNG'leri silip `scripts/setup.sh rebuild` (ya da menü `Tools/Project/Rebuild UI Kit`). Ekran yazı plakaları (`UiPlate`) eski koyu yarı saydam `UI/Panel.png`'yi kullanmaya devam eder.
 - Sprite gotcha: `spriteImportMode` **Single** olmalı, Multiple'da importer border'ı yok sayılır ve 9-slice görsel elips gibi gerilir (`ArtBuilder.EnsureRoundedSprite` her çalıştırmada doğrular).
 - Yüksek kalite ışık/texture kapsam dışı. Kamera: izometrik takip (`IsoCameraFollow`).
 

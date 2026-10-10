@@ -412,7 +412,7 @@ namespace Game.Editor
 
         // ---------- HUD ----------
 
-        static readonly Color PanelColor = new Color(0.17f, 0.13f, 0.25f, 0.86f);
+        static readonly Color PanelColor = new Color(0.43f, 0.35f, 0.74f);   // tints the white kit panel
         static readonly Color InkColor = new Color(0.17f, 0.13f, 0.2f);
 
         static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard)
@@ -430,21 +430,22 @@ namespace Game.Editor
             scaler.matchWidthOrHeight = 0.5f;
             var root = canvasGo.transform;
 
-            var rounded = ArtBuilder.EnsureRoundedSprite();
+            var rounded = ArtBuilder.EnsureRoundedSprite();   // plain dark plates for on-screen messages
+            var kit = UiKitBuilder.Panel;
+            var buttonSprite = UiKitBuilder.Button;
             var knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
 
             // Dashboard first so it sits behind the in-game widgets in the hierarchy.
-            dashboard = BuildDashboard(root, rounded, font, outlineMat);
+            dashboard = BuildDashboard(root, kit, buttonSprite, rounded, font, outlineMat);
 
             // Always visible: coins and level (top-left), hints and the big centre messages.
-            var coinPanel = Panel(root, "CoinPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -40f), new Vector2(380f, 100f));
-            var coin = MakeImage(coinPanel, "Coin", knob, new Color(1f, 0.84f, 0.2f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(68f, 68f));
-            MakeImage(coin.transform, "Shine", knob, new Color(1f, 0.95f, 0.6f), new Vector2(0.5f, 0.5f), new Vector2(-6f, 6f), new Vector2(22f, 22f));
+            var coinPanel = Panel(root, "CoinPanel", kit, PanelColor, new Vector2(0f, 1f), new Vector2(64f, -40f), new Vector2(380f, 100f));
+            MakeImage(coinPanel, "Coin", UiKitBuilder.Coin, Color.white, new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(76f, 76f));
             var coinsText = Label(coinPanel, "Coins", font, outlineMat, 58, Color.white, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0f, 0.5f), new Vector2(104f, 0f), new Vector2(250f, 90f));
 
-            var levelPanel = Panel(root, "LevelPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -150f), new Vector2(380f, 84f));
-            EnergyRow(levelPanel, rounded, font, "SEVİYE", -8f, out var levelLabel, out _, out var levelFill, out var levelFillImage);
+            var levelPanel = Panel(root, "LevelPanel", kit, PanelColor, new Vector2(0f, 1f), new Vector2(64f, -150f), new Vector2(380f, 84f));
+            EnergyRow(levelPanel, UiKitBuilder.Star, font, "SEVİYE", -8f, out var levelLabel, out _, out var levelFill, out var levelFillImage);
             levelFillImage.color = new Color(0.45f, 0.82f, 1f);
 
             // Every on-screen message sits on a translucent dark plate so it stays readable over any background.
@@ -462,28 +463,28 @@ namespace Game.Editor
             var buildingPlate = TextPlate(group, "BuildingPlate", rounded, font, outlineMat, 46, Color.white, new Vector2(0.5f, 1f), new Vector2(0f, -40f));
             var boostPlate = TextPlate(group, "BoostPlate", rounded, font, outlineMat, 52, new Color(1f, 0.65f, 0.2f), new Vector2(0.5f, 1f), new Vector2(0f, -130f));
 
-            var energyPanel = Panel(group, "EnergyPanel", rounded, PanelColor, new Vector2(0f, 1f), new Vector2(40f, -245f), new Vector2(380f, 84f));
-            EnergyRow(energyPanel, rounded, font, "ENERJİ", -8f, out var energyLabel, out var energyBack, out var playerFill, out var playerFillImage);
+            var energyPanel = Panel(group, "EnergyPanel", kit, PanelColor, new Vector2(0f, 1f), new Vector2(64f, -245f), new Vector2(380f, 84f));
+            EnergyRow(energyPanel, UiKitBuilder.Bolt, font, "ENERJİ", -8f, out var energyLabel, out var energyBack, out var playerFill, out var playerFillImage);
 
-            var exitButton = TintedButton(group, "ExitButton", rounded, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(300f, 90f),
+            var exitButton = TintedButton(group, "ExitButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(300f, 90f),
                 new Color(0.62f, 0.85f, 1f), 34, out var exitLabel);
             exitLabel.text = "HARİTA";
 
             // Bottom-right, where the right thumb rests: shop and the cola you carry.
-            var shopButton = TintedButton(group, "ShopButton", rounded, font, new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(300f, 100f),
+            var shopButton = TintedButton(group, "ShopButton", buttonSprite, font, new Vector2(1f, 0f), new Vector2(-40f, 40f), new Vector2(300f, 100f),
                 new Color(1f, 0.79f, 0.24f), 36, out var shopLabel);
             shopLabel.text = "MAĞAZA";
-            var colaUseButton = TintedButton(group, "ColaUseButton", rounded, font, new Vector2(1f, 0f), new Vector2(-40f, 160f), new Vector2(300f, 100f),
+            var colaUseButton = TintedButton(group, "ColaUseButton", buttonSprite, font, new Vector2(1f, 0f), new Vector2(-40f, 160f), new Vector2(300f, 100f),
                 new Color(1f, 0.93f, 0.35f), 32, out var colaUseLabel);
 
-            var shop = BuildShop(group, rounded, font);
+            var shop = BuildShop(group, kit, buttonSprite, font);
             BuildTouchControls(group, knob);
 
             // Music and effects switches, top-right on every screen (GameHud shifts them left of the map button inside a district).
             var audioGroup = Rect(root, "AudioGroup", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            var musicButton = TintedButton(audioGroup, "MusicButton", rounded, font, new Vector2(1f, 1f), new Vector2(-205f, -40f), new Vector2(150f, 90f),
+            var musicButton = TintedButton(audioGroup, "MusicButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-205f, -40f), new Vector2(150f, 90f),
                 new Color(0.85f, 0.8f, 1f), 28, out var musicLabel);
-            var sfxButton = TintedButton(audioGroup, "SfxButton", rounded, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(150f, 90f),
+            var sfxButton = TintedButton(audioGroup, "SfxButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(150f, 90f),
                 new Color(0.85f, 0.8f, 1f), 28, out var sfxLabel);
             var audioSettings = audioGroup.gameObject.AddComponent<AudioSettingsButtons>();
             EditorWire.Set(audioSettings, "audioManager", audioManager);
@@ -542,7 +543,7 @@ namespace Game.Editor
 
         // The map screen: world name with arrows on top, a hint at the bottom and one card per district (placed over the
         // district's position by DashboardHud every frame).
-        static DashboardHud BuildDashboard(Transform root, Sprite rounded, TMP_FontAsset font, Material outlineMat)
+        static DashboardHud BuildDashboard(Transform root, Sprite kit, Sprite buttonSprite, Sprite rounded, TMP_FontAsset font, Material outlineMat)
         {
             var groupRt = Rect(root, "DashboardGroup", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
             groupRt.anchorMin = Vector2.zero;
@@ -550,16 +551,16 @@ namespace Game.Editor
             groupRt.offsetMin = groupRt.offsetMax = Vector2.zero;
             var group = groupRt.transform;
 
-            var titlePanel = Panel(group, "WorldPanel", rounded, PanelColor, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(560f, 100f));
+            var titlePanel = Panel(group, "WorldPanel", kit, PanelColor, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(560f, 100f));
             titlePanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             var worldName = Label(titlePanel, "WorldName", font, outlineMat, 60, Color.white, TextAlignmentOptions.Center,
                 new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 90f));
             worldName.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
-            var previous = TintedButton(group, "PreviousWorld", rounded, font, new Vector2(0.5f, 1f), new Vector2(-340f, -45f), new Vector2(90f, 90f),
+            var previous = TintedButton(group, "PreviousWorld", buttonSprite, font, new Vector2(0.5f, 1f), new Vector2(-340f, -45f), new Vector2(90f, 90f),
                 new Color(1f, 0.86f, 0.35f), 44, out var previousLabel);
             previousLabel.text = "<";
-            var next = TintedButton(group, "NextWorld", rounded, font, new Vector2(0.5f, 1f), new Vector2(340f, -45f), new Vector2(90f, 90f),
+            var next = TintedButton(group, "NextWorld", buttonSprite, font, new Vector2(0.5f, 1f), new Vector2(340f, -45f), new Vector2(90f, 90f),
                 new Color(1f, 0.86f, 0.35f), 44, out var nextLabel);
             nextLabel.text = ">";
             // TintedButton pivots at its anchor; centre the arrows on their x so they sit symmetrically beside the title.
@@ -570,7 +571,7 @@ namespace Game.Editor
             var cards = new DistrictCard[Balance.Districts.Length];
             for (var i = 0; i < cards.Length; i++)
             {
-                var button = TintedButton(group, $"Card {i + 1}", rounded, font, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 120f),
+                var button = TintedButton(group, $"Card {i + 1}", buttonSprite, font, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 120f),
                     new Color(1f, 0.86f, 0.35f), 40, out var label);
                 var rt = button.GetComponent<RectTransform>();
                 rt.pivot = new Vector2(0.5f, 0.5f);
@@ -644,28 +645,28 @@ namespace Game.Editor
 
         // Side panel with the four purchases. The ShopPanel component sits on an always-active empty object so it can
         // keep sliding the (otherwise inactive) panel in and out.
-        static ShopPanel BuildShop(Transform root, Sprite rounded, TMP_FontAsset font)
+        static ShopPanel BuildShop(Transform root, Sprite kit, Sprite buttonSprite, TMP_FontAsset font)
         {
             var host = Rect(root, "Shop", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             var shop = host.gameObject.AddComponent<ShopPanel>();
 
             var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -150f), new Vector2(520f, 662f));
             var back = panelRt.gameObject.AddComponent<Image>();
-            back.sprite = rounded;
+            back.sprite = kit;
             back.type = Image.Type.Sliced;
             back.color = PanelColor;
 
             var title = Label(panelRt, "Title", font, null, 40, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 1f), new Vector2(28f, -20f), new Vector2(300f, 56f));
             title.text = "MAĞAZA";
-            var close = TintedButton(panelRt, "CloseButton", rounded, font, new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(64f, 64f),
+            var close = TintedButton(panelRt, "CloseButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(64f, 64f),
                 new Color(1f, 0.45f, 0.4f), 36, out var closeLabel);
             closeLabel.text = "X";
 
-            var hammer = ShopCard(panelRt, "HammerButton", rounded, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
-            var worker = ShopCard(panelRt, "WorkerButton", rounded, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
-            var stamina = ShopCard(panelRt, "StaminaButton", rounded, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
-            var speed = ShopCard(panelRt, "SpeedButton", rounded, font, 3, new Color(0.62f, 0.78f, 1f), out var speedLabel);
-            var cola = ShopCard(panelRt, "ColaBuyButton", rounded, font, 4, new Color(1f, 0.55f, 0.3f), out var colaLabel);
+            var hammer = ShopCard(panelRt, "HammerButton", buttonSprite, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
+            var worker = ShopCard(panelRt, "WorkerButton", buttonSprite, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            var stamina = ShopCard(panelRt, "StaminaButton", buttonSprite, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
+            var speed = ShopCard(panelRt, "SpeedButton", buttonSprite, font, 3, new Color(0.62f, 0.78f, 1f), out var speedLabel);
+            var cola = ShopCard(panelRt, "ColaBuyButton", buttonSprite, font, 4, new Color(1f, 0.55f, 0.3f), out var colaLabel);
 
             EditorWire.Set(shop, "panel", panelRt);
             EditorWire.Set(shop, "closeButton", close);
@@ -733,7 +734,7 @@ namespace Game.Editor
                 fadeDuration = 0.08f,
             };
 
-            label = Label(rt, "Label", font, null, fontSize, InkColor, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, size - new Vector2(20f, 10f));
+            label = Label(rt, "Label", font, null, fontSize, InkColor, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), size - new Vector2(20f, 10f));   // +4: clear of the bottom lip
             label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             return button;
         }
@@ -769,18 +770,18 @@ namespace Game.Editor
         }
 
         // Label on top, bar underneath; the fill stretches to its back image so the HUD can drive it with anchorMax.x.
-        static void EnergyRow(Transform panel, Sprite rounded, TMP_FontAsset font, string title, float y,
+        // The icon hangs off the panel's left edge like a badge.
+        static void EnergyRow(Transform panel, Sprite icon, TMP_FontAsset font, string title, float y,
             out TMP_Text label, out RectTransform backRect, out RectTransform fill, out Image fillImage)
         {
             label = Label(panel, title + "Label", font, null, 26, Color.white, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0f, 1f), new Vector2(18f, y), new Vector2(340f, 32f));
             label.text = title;
-            var back = Rect(panel, title + "Bar", new Vector2(0f, 1f), new Vector2(18f, y - 36f), new Vector2(344f, 24f));
+            var back = Rect(panel, title + "Bar", new Vector2(0f, 1f), new Vector2(18f, y - 36f), new Vector2(344f, 30f));
             var backImg = back.gameObject.AddComponent<Image>();
-            backImg.sprite = rounded;
+            backImg.sprite = UiKitBuilder.BarBack;
             backImg.type = Image.Type.Sliced;
-            backImg.pixelsPerUnitMultiplier = 2f;   // bars are only 24 px tall: halve the border so the corners stay slight
-            backImg.color = new Color(0.08f, 0.06f, 0.12f, 0.9f);
+            backImg.color = new Color(0.3f, 0.24f, 0.5f);   // groove tint: the sprite's ink outline stays dark
             backImg.raycastTarget = false;
             backRect = back;
 
@@ -788,10 +789,15 @@ namespace Game.Editor
             fill.pivot = new Vector2(0f, 0.5f);
             fill.anchorMin = new Vector2(0f, 0f);
             fill.anchorMax = new Vector2(1f, 1f);
-            fill.offsetMin = new Vector2(3f, 3f);
-            fill.offsetMax = new Vector2(-3f, -3f);
+            fill.offsetMin = new Vector2(4f, 4f);
+            fill.offsetMax = new Vector2(-4f, -4f);
             fillImage = fill.gameObject.AddComponent<Image>();
+            fillImage.sprite = UiKitBuilder.BarFill;
+            fillImage.type = Image.Type.Sliced;
             fillImage.raycastTarget = false;
+
+            var badge = MakeImage(panel, title + "Icon", icon, Color.white, new Vector2(0f, 0.5f), new Vector2(-30f, 0f), new Vector2(64f, 64f));
+            badge.rectTransform.pivot = new Vector2(0.5f, 0.5f);
         }
     }
 }
