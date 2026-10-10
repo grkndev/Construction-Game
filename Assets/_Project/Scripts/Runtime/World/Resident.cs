@@ -9,26 +9,33 @@ namespace Game.World
     /// </summary>
     public sealed class Resident : MonoBehaviour
     {
-        const float WanderRadius = 1.6f;
+        const float WanderRadius = 1.0f;   // small: the villager keeps to a patch of ground in front of their home, away from where helpers work
         const float WalkSpeed = 1.1f;
 
         Vector3 home;
         Vector3 target;
         Transform body;
         Transform arm;
+        CharacterController walker;
+        float stuckTime;
+        int stuckCount;
+        District district;
         GameObject alert;
         float wait;
         float waveTime;
         bool problem;
         float phase;
 
-        public static Resident Spawn(Transform parent, Vector3 homePosition, ToonPalette palette, int variant)
+        public static Resident Spawn(Transform parent, Vector3 homePosition, ToonPalette palette, int variant, Transform player)
         {
             var go = new GameObject("Resident");
             go.transform.SetParent(parent, false);
             go.transform.position = homePosition;
             var resident = go.AddComponent<Resident>();
             resident.Build(palette, variant);
+            resident.district = parent.GetComponent<District>();
+            resident.walker = Walk.AddBody(go, 0.3f, 1.7f);   // solid: villagers do not walk through walls, decorations or each other
+            Walk.IgnorePlayer(resident.walker, player);
             resident.home = resident.target = homePosition;
             resident.wait = Random.Range(0.5f, 3f);
             resident.phase = Random.value * 6.28f;
@@ -60,6 +67,15 @@ namespace Game.World
             alert.SetActive(false);
         }
 
+        /// <summary>Stops strolling and waves for a moment (a finished building: the new neighbour is happy).</summary>
+        public void Cheer()
+        {
+            if (problem) return;
+            target = transform.position;
+            waveTime = 2.4f;
+            wait = 3f;
+        }
+
         /// <summary>True while the home has a problem: stop strolling, show the alert, wave for help.</summary>
         public void SetProblem(bool value)
         {
@@ -84,7 +100,17 @@ namespace Game.World
             to.y = 0f;
             if (to.magnitude > 0.08f)
             {
-                transform.position += to.normalized * (WalkSpeed * Time.deltaTime);
+                stuckTime = Walk.Step(transform, walker, to.normalized * (WalkSpeed * Time.deltaTime)) ? 0f : stuckTime + Time.deltaTime;
+                if (stuckTime > 0.8f)
+                {
+                    stuckTime = 0f;
+                    target = transform.position;   // something is in the way: stop here and look around instead of pushing on
+                    if (++stuckCount >= 2)
+                    {
+                        stuckCount = 0;
+                        Walk.Unstick(transform, walker, home, district);   // wedged: go back to the front door
+                    }
+                }
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(to), 8f * Time.deltaTime);
                 body.localPosition = new Vector3(0f, Mathf.Abs(Mathf.Sin(phase * 8f)) * 0.06f, 0f);
                 arm.localRotation = Quaternion.Euler(Mathf.Sin(phase * 8f) * 30f, 0f, 0f);
@@ -113,8 +139,14 @@ namespace Game.World
             }
             else
             {
-                var offset = Random.insideUnitCircle * WanderRadius;
-                target = home + new Vector3(offset.x, 0f, offset.y);
+                for (var attempt = 0; attempt < 6; attempt++)
+                {
+                    var offset = Random.insideUnitCircle * WanderRadius;
+                    var candidate = home + new Vector3(offset.x, 0f, offset.y);
+                    if (!Walk.IsFree(candidate, 0.6f, walker)) continue;   // not into a wall, a helper or a decoration
+                    target = candidate;
+                    break;
+                }
                 wait = Random.Range(1.5f, 4f);
             }
         }

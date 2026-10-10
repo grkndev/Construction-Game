@@ -286,10 +286,21 @@ namespace Game.Editor
             EditorWire.Set(visual, "body", body);
             EditorWire.Set(visual, "hammerPivot", pivot);
             EditorWire.Set(visual, "aura", aura.transform);
+            EditorWire.SetArray(visual, "headMaterials", new Object[] { p.hammerHead, p.hull, p.green, p.yellow, p.white });   // one per HammerLook band
 
             // Energy bar above the head (hidden while full); the Character component drives it.
             var bar = MeterBar.Create(root.transform, "EnergyBar", new Vector3(0f, 2.3f, 0f), 1.0f, 0.16f,
                 p.barBack, p.energyFill, p.energyLow, hideWhenFull: true);
+            if (kind == CharacterKind.Worker)
+            {
+                // Helpers are solid (see World/Walk): they slide around buildings, decorations and each other. The player's body is added by the scene builder.
+                var walker = root.AddComponent<CharacterController>();
+                walker.radius = 0.42f;
+                walker.height = 1.9f;
+                walker.center = new Vector3(0f, 0.97f, 0f);
+                walker.stepOffset = 0.15f;
+                walker.skinWidth = 0.04f;
+            }
             var character = root.AddComponent<Character>();
             EditorWire.SetInt(character, "kind", (int)kind);
             EditorWire.Set(character, "visual", visual);

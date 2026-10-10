@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Game.World
 {
     /// <summary>Drops a Sarı Kola somewhere on the island every so often and lets the player pick it up by walking over it.</summary>
-    public sealed class ColaSpawner : MonoBehaviour
+    public sealed class ColaSpawner : PickupSource
     {
         const float PickupRadius = 1.7f;
         const float MinPlotDistance = 5.6f;
@@ -18,6 +18,24 @@ namespace Game.World
         readonly List<ColaPickup> alive = new List<ColaPickup>();
         float timer;
         bool announced;
+
+        public override bool Wanted => game.ColaCount < Balance.MaxColaInventory;
+
+        /// <summary>The nearest can lying in the district to the player, and how far it is (flat distance).</summary>
+        public override bool TryNearest(out Vector3 position, out float distance)
+        {
+            position = default;
+            distance = float.MaxValue;
+            foreach (var pickup in alive)
+            {
+                if (pickup == null) continue;
+                var d = Vector3.ProjectOnPlane(pickup.transform.position - player.position, Vector3.up).magnitude;
+                if (d >= distance) continue;
+                distance = d;
+                position = pickup.transform.position;
+            }
+            return distance < float.MaxValue;
+        }
 
         void Start()
         {
@@ -63,29 +81,20 @@ namespace Game.World
 
         void TrySpawn()
         {
-            for (var attempt = 0; attempt < 30; attempt++)
-            {
-                var district = game.CurrentDistrict;
-                var reach = district.HalfSize * 0.85f;
-                var point = district.Clamp(district.Center + new Vector3(Random.Range(-reach, reach), 0f, Random.Range(-reach, reach)));
-                if (!IsFree(point)) continue;
+            if (!SpawnPoints.TryFind(game.CurrentDistrict, MinPlotDistance, IsFree, out var point)) return;
 
-                var pickup = ColaPickup.Spawn(point, palette);
-                pickup.Expired += p => alive.Remove(p);
-                alive.Add(pickup);
-                if (!announced)
-                {
-                    announced = true;
-                    game.ShowHint("Haritada bir Sarı Kola belirdi! Üstünden geç, sonra iç.");
-                }
-                return;
+            var pickup = ColaPickup.Spawn(point, palette);
+            pickup.Expired += p => alive.Remove(p);
+            alive.Add(pickup);
+            if (!announced)
+            {
+                announced = true;
+                game.ShowHint("Haritada bir Sarı Kola belirdi! Üstünden geç, sonra iç.");
             }
         }
 
         bool IsFree(Vector3 point)
         {
-            foreach (var site in game.Sites)
-                if ((site.transform.position - point).magnitude < MinPlotDistance) return false;
             foreach (var other in alive)
                 if (other != null && (other.transform.position - point).magnitude < MinColaDistance) return false;
             return (player.position - point).magnitude > 3f;   // never right under the player's feet

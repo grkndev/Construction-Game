@@ -24,13 +24,14 @@ namespace Game.Editor
         public static Sprite Star => Load("Star", 96, 96, 0, 0, p => Poly(p, 96, StarPoints(), new Color(1f, 0.85f, 0.2f)));
         public static Sprite Knob => Load("Knob", 64, 64, 0, 0, KnobPixel);
         public static Sprite Gear => Load("Gear", 96, 96, 0, 0, GearPixel);
+        public static Sprite Arrow => Load("Arrow", 96, 96, 0, 0, p => Poly(p, 96, ArrowPoints(), new Color(0.97f, 0.97f, 1f)));   // white: tinted per pointer
         public static Sprite Bolt => Load("Bolt", 96, 96, 0, 0, p => Poly(p, 96, BoltPoints(), new Color(0.5f, 0.95f, 0.4f)));
 
         [MenuItem("Tools/Project/Rebuild UI Kit")]
         public static void Rebuild()
         {
             if (Directory.Exists(Dir)) foreach (var f in Directory.GetFiles(Dir, "*.png")) AssetDatabase.DeleteAsset(f.Replace('\\', '/'));
-            _ = Panel; _ = Button; _ = BarBack; _ = BarFill; _ = Coin; _ = Star; _ = Bolt; _ = Knob; _ = Gear;
+            _ = Panel; _ = Button; _ = BarBack; _ = BarFill; _ = Coin; _ = Star; _ = Bolt; _ = Knob; _ = Gear; _ = Arrow;
             AssetDatabase.SaveAssets();
         }
 
@@ -172,6 +173,13 @@ namespace Game.Editor
             }
             return pts;
         }
+
+        // A bold arrow pointing up (+y).
+        static Vector2[] ArrowPoints() => new[]
+        {
+            new Vector2(48f, 92f), new Vector2(90f, 44f), new Vector2(64f, 44f), new Vector2(64f, 6f),
+            new Vector2(32f, 6f), new Vector2(32f, 44f), new Vector2(6f, 44f),
+        };
 
         static Vector2[] BoltPoints() => new[]
         {

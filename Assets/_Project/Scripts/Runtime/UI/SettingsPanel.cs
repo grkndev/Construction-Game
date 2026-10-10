@@ -1,4 +1,5 @@
 using Game.Audio;
+using Game.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -21,6 +22,8 @@ namespace Game.UI
         [SerializeField] TMP_Text musicValue;
         [SerializeField] Slider sfxSlider;
         [SerializeField] TMP_Text sfxValue;
+        [SerializeField] Button shakeButton;
+        [SerializeField] TMP_Text shakeLabel;
 
         void Start()
         {
@@ -31,6 +34,8 @@ namespace Game.UI
             musicSlider.onValueChanged.AddListener(v => { audioManager.SetMusicLevel(v); ShowValues(); });
             sfxSlider.onValueChanged.AddListener(v => { audioManager.SetSfxLevel(v); ShowValues(); });
             openButton.onClick.AddListener(() => SetOpen(!window.activeSelf));
+            ShowShake();
+            shakeButton.onClick.AddListener(() => { FeelSettings.ShakeEnabled = !FeelSettings.ShakeEnabled; ShowShake(); });
             closeButton.onClick.AddListener(() => SetOpen(false));
             overlayButton.onClick.AddListener(() => SetOpen(false));
         }
@@ -47,6 +52,13 @@ namespace Game.UI
             if (window.activeSelf == open) return;
             window.SetActive(open);
             if (open) transform.SetAsLastSibling();   // above whatever else is on screen
+        }
+
+        void ShowShake()
+        {
+            var on = FeelSettings.ShakeEnabled;
+            shakeLabel.text = on ? "AÇIK" : "KAPALI";
+            shakeButton.image.color = on ? new Color(0.5f, 0.9f, 0.55f) : new Color(0.7f, 0.68f, 0.78f);
         }
 
         void ShowValues()

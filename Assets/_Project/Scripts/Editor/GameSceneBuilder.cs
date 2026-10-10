@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using Game.Audio;
 using Game.Core;
+using Game.Feel;
 using Game.Player;
 using Game.UI;
 using Game.World;
@@ -28,6 +29,8 @@ namespace Game.Editor
         const float HalfSize = 26f;
         const float BeachWidth = 3.5f;        // on a coast the ground ends this far past the play area
         const float DistrictSpacing = 1000f;
+        // Where the six decorations of a finished district go (building order): two on the middle lane, four towards the corners, all clear of the plots.
+        static readonly Vector2[] DecorationSlotSpots = { new Vector2(-8f, 0f), new Vector2(8f, 0f), new Vector2(-21f, -19f), new Vector2(21f, 19f), new Vector2(-21f, 19f), new Vector2(21f, -19f) };
         const float ViewAspect = 2.6f;        // widest screen the ground must cover (20:9 phones are 2.2)
         static readonly Vector2[] PlotGrid = { new Vector2(-16f, -10f), new Vector2(0f, -10f), new Vector2(-16f, 10f), new Vector2(16f, -10f), new Vector2(0f, 10f), new Vector2(16f, 10f) };
 
@@ -80,8 +83,16 @@ namespace Game.Editor
             EditorWire.Set(spawner, "game", game);
             EditorWire.Set(spawner, "player", player.transform);
             EditorWire.Set(spawner, "palette", palette);
+            var events = new GameObject("Events").AddComponent<EventSpawner>();   // chests, birds and strays (World/EventSpawner)
+            EditorWire.Set(events, "game", game);
+            EditorWire.Set(events, "player", player.transform);
+            EditorWire.Set(events, "palette", palette);
             var audioManager = BuildAudio(game);
-            BuildHud(font, outlineMat, audioManager, out var hud, out var dashboard, out var fade);
+            BuildHud(font, outlineMat, audioManager, out var hud, out var dashboard, out var fade, out var coinFlight, out var banner, out var colaPointer, out var chestPointer);
+            EditorWire.Set(colaPointer, "game", game);
+            EditorWire.Set(colaPointer, "spawner", spawner);
+            EditorWire.Set(chestPointer, "game", game);
+            EditorWire.Set(chestPointer, "spawner", events);
 
             EditorWire.SetArray(game, "districts", districts);
             EditorWire.Set(game, "workerPrefab", autoWorker);
@@ -89,6 +100,14 @@ namespace Game.Editor
             EditorWire.Set(game, "hud", hud);
             EditorWire.Set(game, "dashboard", dashboard);
             EditorWire.Set(game, "fade", fade);
+
+            var feel = new GameObject("Feel").AddComponent<FeelDirector>();
+            EditorWire.Set(feel, "game", game);
+            EditorWire.Set(feel, "cameraRig", cameraRig);
+            EditorWire.Set(feel, "coins", coinFlight);
+            EditorWire.Set(feel, "banner", banner);
+            EditorWire.Set(feel, "mapFlags", map.Flags);
+            EditorWire.Set(feel, "mapFx", map.Fx);
             EditorWire.Set(game, "cameraRig", cameraRig);
             EditorWire.Set(game, "overviewTarget", overview);
             EditorWire.Set(game, "mapRoot", map.Root);
@@ -170,6 +189,8 @@ namespace Game.Editor
             {
                 if (Mathf.Abs(spot.x) > HalfSize - 1.5f || Mathf.Abs(spot.z) > HalfSize - 1.5f) return false;
                 if (Vector3.Distance(spot, landmarkSpot) < 5.5f) return false;
+                foreach (var slotSpot in DecorationSlotSpots)
+                    if (Vector2.Distance(new Vector2(spot.x, spot.z), slotSpot) < 4.6f) return false;   // keep the decoration slots clear
                 for (var n = 0; n < plotSpots.Length; n++)
                     if (Vector3.Distance(spot, plotSpots[n]) < yardRadius[n] + margin) return false;
                 return true;
@@ -244,6 +265,15 @@ namespace Game.Editor
             EditorWire.Set(district, "playerSpawn", playerSpawn);
             EditorWire.Set(district, "workerSpawn", workerSpawn);
             EditorWire.SetFloat(district, "halfSize", HalfSize);
+            EditorWire.Set(district, "fx", BuildFeelFx(t));
+            var slots = new Transform[DecorationSlotSpots.Length];
+            for (var n = 0; n < slots.Length; n++)
+            {
+                slots[n] = new GameObject($"DecorSlot {n + 1}").transform;
+                slots[n].SetParent(t, false);
+                slots[n].localPosition = new Vector3(DecorationSlotSpots[n].x, 0f, DecorationSlotSpots[n].y);
+            }
+            EditorWire.SetArray(district, "decorationSlots", slots);
             root.SetActive(false);   // switched on by the first visit; its forest and fence are merged then, not at startup
             return district;
         }
@@ -298,11 +328,12 @@ namespace Game.Editor
             world.localPosition = localPosition;
             world.localRotation = Quaternion.Euler(0f, -outwardDegrees, 0f);
             world.localScale = Vector3.one * scale;
+            var solid = !onLand;   // landmarks in the district are solid; on the map they are only a picture
 
             switch (index)
             {
                 case 0:   // Sahil: beach umbrella and a rowing boat on the water
-                    Prim.Cylinder(world, "Pole", new Vector3(0f, 1.1f, 0f), new Vector3(0.08f, 1.1f, 0.08f), p.scaffold);
+                    Prim.Cylinder(world, "Pole", new Vector3(0f, 1.1f, 0f), new Vector3(0.08f, 1.1f, 0.08f), p.scaffold, solid);
                     Prim.Sphere(world, "Canopy", new Vector3(0f, 2.2f, 0f), new Vector3(2.4f, 0.7f, 2.4f), p.roof);
                     if (onLand) break;
                     Prim.Cube(world, "Hull", new Vector3(3.6f, -1.75f, 0f), new Vector3(2.8f, 0.5f, 1.2f), p.crate);
@@ -310,7 +341,7 @@ namespace Game.Editor
                     Prim.Cube(world, "Sail", new Vector3(3.6f, -0.7f, 0f), new Vector3(0.05f, 1.0f, 0.9f), p.flag);
                     break;
                 case 1:   // Merkez: fountain
-                    Prim.Cylinder(world, "Basin", new Vector3(0f, 0.25f, 0f), new Vector3(3.2f, 0.25f, 3.2f), p.stone);
+                    Prim.Cylinder(world, "Basin", new Vector3(0f, 0.25f, 0f), new Vector3(3.2f, 0.25f, 3.2f), p.stone, solid);
                     Prim.Cylinder(world, "Water", new Vector3(0f, 0.52f, 0f), new Vector3(2.7f, 0.02f, 2.7f), p.sea);
                     Prim.Cylinder(world, "Pillar", new Vector3(0f, 1.2f, 0f), new Vector3(0.45f, 0.8f, 0.45f), p.stone);
                     Prim.Sphere(world, "Drop", new Vector3(0f, 2.2f, 0f), Vector3.one * 0.7f, p.window);
@@ -322,12 +353,12 @@ namespace Game.Editor
                         Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, 0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
                         Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, -0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
                     }
-                    Prim.Cylinder(world, "CraneMast", new Vector3(0f, 2.2f, 1.8f), new Vector3(0.3f, 2.2f, 0.3f), p.cone);
+                    Prim.Cylinder(world, "CraneMast", new Vector3(0f, 2.2f, 1.8f), new Vector3(0.3f, 2.2f, 0.3f), p.cone, solid);
                     Prim.Cube(world, "CraneArm", new Vector3(1.4f, 4.3f, 1.8f), new Vector3(3.6f, 0.3f, 0.3f), p.cone);
                     Prim.Cube(world, "Hook", new Vector3(2.8f, 3.5f, 1.8f), new Vector3(0.1f, 1.4f, 0.1f), p.scaffold);
                     break;
                 case 3:   // Tepe: windmill
-                    Prim.Cylinder(world, "Tower", new Vector3(0f, 1.8f, 0f), new Vector3(1.6f, 1.8f, 1.6f), p.walls[1]);
+                    Prim.Cylinder(world, "Tower", new Vector3(0f, 1.8f, 0f), new Vector3(1.6f, 1.8f, 1.6f), p.walls[1], solid);
                     Prim.Cylinder(world, "Cap", new Vector3(0f, 3.8f, 0f), new Vector3(1.9f, 0.2f, 1.9f), p.roof);
                     var hub = new GameObject("Blades").transform;
                     hub.SetParent(world, false);
@@ -337,9 +368,9 @@ namespace Game.Editor
                     Prim.Cube(hub, "BladeB", Vector3.zero, new Vector3(0.12f, 0.45f, 3.6f), p.door);
                     break;
                 default:  // Sanayi: chimney and a storage tank
-                    Prim.Cylinder(world, "Chimney", new Vector3(0f, 3f, 0f), new Vector3(1.2f, 3f, 1.2f), p.stone);
+                    Prim.Cylinder(world, "Chimney", new Vector3(0f, 3f, 0f), new Vector3(1.2f, 3f, 1.2f), p.stone, solid);
                     Prim.Cylinder(world, "Band", new Vector3(0f, 5.6f, 0f), new Vector3(1.3f, 0.35f, 1.3f), p.roof);
-                    Prim.Cylinder(world, "Tank", new Vector3(3f, 1.1f, 0f), new Vector3(2.2f, 1.1f, 2.2f), p.hammerHead);
+                    Prim.Cylinder(world, "Tank", new Vector3(3f, 1.1f, 0f), new Vector3(2.2f, 1.1f, 2.2f), p.hammerHead, solid);
                     Prim.Sphere(world, "TankTop", new Vector3(3f, 2.2f, 0f), new Vector3(2.2f, 0.9f, 2.2f), p.hammerHead);
                     break;
             }
@@ -476,6 +507,85 @@ namespace Game.Editor
             return ps;
         }
 
+        // One-shot effects of a place (see FeelFx): all four systems are moved to where they are wanted and fired with Emit.
+        internal static FeelFx BuildFeelFx(Transform parent)
+        {
+            var go = new GameObject("FeelFx");
+            go.transform.SetParent(parent, false);
+            var fx = go.AddComponent<FeelFx>();
+
+            var dust = NewBurstSystem(go.transform, "Dust");
+            var d = dust.main;
+            d.duration = 0.6f;
+            d.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.6f);
+            d.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 2.2f);
+            d.startSize = new ParticleSystem.MinMaxCurve(0.2f, 0.45f);
+            d.gravityModifier = -0.12f;
+            d.startColor = new ParticleSystem.MinMaxGradient(new Color(0.93f, 0.88f, 0.78f), Color.white);
+            var dustShape = dust.shape;
+            dustShape.shapeType = ParticleSystemShapeType.Sphere;
+            dustShape.radius = 0.25f;
+            FadeAndShrink(dust);
+
+            var ring = NewBurstSystem(go.transform, "Ring");
+            var r = ring.main;
+            r.duration = 0.6f;
+            r.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.55f);
+            r.startSpeed = new ParticleSystem.MinMaxCurve(3f, 4.5f);
+            r.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.3f);
+            r.gravityModifier = 0f;
+            r.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.97f, 0.86f), new Color(1f, 0.88f, 0.55f));
+            var ringShape = ring.shape;
+            ringShape.shapeType = ParticleSystemShapeType.Circle;
+            ringShape.radiusThickness = 0f;   // from the edge only: a ring that spreads outwards
+            ringShape.rotation = new Vector3(-90f, 0f, 0f);   // lying on the ground
+            FadeAndShrink(ring);
+
+            var sparkles = NewBurstSystem(go.transform, "Sparkles");
+            var sp = sparkles.main;
+            sp.duration = 1f;
+            sp.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.3f);
+            sp.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.4f);
+            sp.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.36f);
+            sp.gravityModifier = -0.1f;
+            sp.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.9f, 0.4f), new Color(1f, 1f, 0.85f));
+            var sparkleShape = sparkles.shape;
+            sparkleShape.shapeType = ParticleSystemShapeType.Box;
+            FadeAndShrink(sparkles);
+
+            var firework = NewBurstSystem(go.transform, "Firework");
+            var f = firework.main;
+            f.duration = 1.5f;
+            f.startLifetime = new ParticleSystem.MinMaxCurve(1f, 1.5f);
+            f.startSpeed = new ParticleSystem.MinMaxCurve(5f, 9f);
+            f.startSize = new ParticleSystem.MinMaxCurve(0.22f, 0.4f);
+            f.gravityModifier = 0.8f;
+            var fireShape = firework.shape;
+            fireShape.shapeType = ParticleSystemShapeType.Sphere;
+            fireShape.radius = 0.25f;
+            FadeAndShrink(firework);
+
+            EditorWire.Set(fx, "dust", dust);
+            EditorWire.Set(fx, "ring", ring);
+            EditorWire.Set(fx, "sparkles", sparkles);
+            EditorWire.Set(fx, "firework", firework);
+            return fx;
+        }
+
+        // Particles fade out and shrink towards the end of their life.
+        static void FadeAndShrink(ParticleSystem ps)
+        {
+            var colour = ps.colorOverLifetime;
+            colour.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.6f), new GradientAlphaKey(0f, 1f) });
+            colour.color = gradient;
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.25f));
+        }
+
         // ---------- player / camera ----------
 
         static PlayerController BuildPlayer(GameController game)
@@ -525,7 +635,8 @@ namespace Game.Editor
         static readonly Color PanelColor = new Color(0.43f, 0.35f, 0.74f);   // tints the white kit panel
         static readonly Color InkColor = new Color(0.17f, 0.13f, 0.2f);
 
-        static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard, out ScreenFade fade)
+        static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard, out ScreenFade fade,
+            out CoinFlight coinFlight, out CeremonyBanner banner, out ColaPointer colaPointer, out ColaPointer chestPointer)
         {
             var es = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(InputSystemUIInputModule));
             es.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
@@ -550,7 +661,7 @@ namespace Game.Editor
 
             // Always visible: coins and level (top-left), hints and the big centre messages.
             var coinPanel = Panel(root, "CoinPanel", kit, PanelColor, new Vector2(0f, 1f), new Vector2(64f, -40f), new Vector2(380f, 100f));
-            MakeImage(coinPanel, "Coin", UiKitBuilder.Coin, Color.white, new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(76f, 76f));
+            var coinIcon = MakeImage(coinPanel, "Coin", UiKitBuilder.Coin, Color.white, new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(76f, 76f));
             var coinsText = Label(coinPanel, "Coins", font, outlineMat, 58, Color.white, TextAlignmentOptions.MidlineLeft,
                 new Vector2(0f, 0.5f), new Vector2(104f, 0f), new Vector2(250f, 90f));
 
@@ -560,8 +671,6 @@ namespace Game.Editor
 
             // Every on-screen message sits on a translucent dark plate so it stays readable over any background.
             var hintPlate = TextPlate(root, "HintPlate", rounded, font, outlineMat, 34, new Color(1f, 0.96f, 0.8f), new Vector2(0.5f, 0f), new Vector2(0f, 205f));
-            var victoryPlate = TextPlate(root, "VictoryPlate", rounded, font, outlineMat, 110, new Color(1f, 0.86f, 0.25f), new Vector2(0.5f, 0.5f), new Vector2(0f, 60f));
-            var levelPlate = TextPlate(root, "LevelPlate", rounded, font, outlineMat, 96, new Color(0.55f, 0.88f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, 200f));
 
             // Only while inside a district: the player's energy, the active building, shop, cola, back to the map, touch stick.
             var groupRt = Rect(root, "DistrictGroup", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
@@ -590,6 +699,12 @@ namespace Game.Editor
             var shop = BuildShop(group, kit, buttonSprite, font);
             BuildTouchControls(group, knob);
 
+            // The big-moment ribbon and the flying coins (Game.Feel). They sit above the HUD widgets but below the settings window and the fade.
+            coinFlight = BuildCoinFlight(root, coinIcon.rectTransform);
+            banner = BuildBanner(root, kit, font, outlineMat);
+            colaPointer = BuildColaPointer(group, font, outlineMat, "ColaPointer", "Kola", new Color(1f, 0.88f, 0.3f));
+            chestPointer = BuildColaPointer(group, font, outlineMat, "ChestPointer", "Sandık", new Color(0.55f, 0.85f, 1f));
+
             // Settings gear, top-right on every screen (GameHud shifts it left of the map button inside a district). It opens the
             // settings window, which is built last so it covers everything.
             var audioGroup = Rect(root, "AudioGroup", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
@@ -608,8 +723,6 @@ namespace Game.Editor
             EditorWire.Set(hud, "levelPanel", levelPanel.GetComponent<RectTransform>());
             EditorWire.Set(hud, "buildingPlate", buildingPlate);
             EditorWire.Set(hud, "hintPlate", hintPlate);
-            EditorWire.Set(hud, "victoryPlate", victoryPlate);
-            EditorWire.Set(hud, "levelPlate", levelPlate);
             EditorWire.Set(hud, "boostPlate", boostPlate);
             EditorWire.Set(hud, "shop", shop);
             EditorWire.Set(hud, "shopButton", shopButton);
@@ -643,6 +756,90 @@ namespace Game.Editor
             EditorWire.SetArray(clicks, "buttons", ticking.ToArray());
         }
 
+        // An arrow with a distance label that ColaPointer moves to the screen edge; the host stays active, the arrow object is shown only when needed.
+        static ColaPointer BuildColaPointer(Transform parent, TMP_FontAsset font, Material outlineMat, string name, string labelText, Color tint)
+        {
+            var host = Rect(parent, name, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var rootRt = Rect(host, "Pointer", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240f, 160f));
+            rootRt.pivot = new Vector2(0.5f, 0.5f);
+            var arrow = MakeImage(rootRt, "Arrow", UiKitBuilder.Arrow, tint, new Vector2(0.5f, 0.5f), new Vector2(0f, 26f), new Vector2(88f, 88f));
+            arrow.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var label = Label(rootRt, "Distance", font, outlineMat, 34, tint, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0f, -40f), new Vector2(240f, 50f));
+            label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var pointer = host.gameObject.AddComponent<ColaPointer>();
+            EditorWire.SetString(pointer, "label", labelText);
+            EditorWire.Set(pointer, "root", rootRt);
+            EditorWire.Set(pointer, "arrow", arrow.rectTransform);
+            EditorWire.Set(pointer, "distance", label);
+            rootRt.gameObject.SetActive(false);
+            return pointer;
+        }
+
+        static CoinFlight BuildCoinFlight(Transform root, RectTransform target)
+        {
+            var layer = Rect(root, "CoinLayer", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            Stretch(layer, 0f, 0f);
+            var images = new Image[24];
+            for (var i = 0; i < images.Length; i++)
+            {
+                images[i] = MakeImage(layer, $"Coin {i}", UiKitBuilder.Coin, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(46f, 46f));
+                images[i].rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                images[i].gameObject.SetActive(false);
+            }
+            var flight = layer.gameObject.AddComponent<CoinFlight>();
+            EditorWire.SetArray(flight, "coins", images);
+            EditorWire.Set(flight, "target", target);
+            return flight;
+        }
+
+        // A ribbon with a big title and a smaller line under it, and a pool of stars for the level burst. Hidden until a ceremony plays.
+        static CeremonyBanner BuildBanner(Transform root, Sprite kit, TMP_FontAsset font, Material outlineMat)
+        {
+            var host = Rect(root, "Ceremony", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            Stretch(host, 0f, 0f);
+            var ribbonRt = Rect(host, "Ribbon", new Vector2(0.5f, 0.5f), new Vector2(0f, 170f), new Vector2(1060f, 270f));
+            ribbonRt.pivot = new Vector2(0.5f, 0.5f);
+            var group = ribbonRt.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+            var ribbon = ribbonRt.gameObject.AddComponent<Image>();
+            ribbon.sprite = kit;
+            ribbon.type = Image.Type.Sliced;
+            ribbon.raycastTarget = false;
+
+            foreach (var side in new[] { -1f, 1f })
+            {
+                var star = MakeImage(ribbonRt, side < 0f ? "StarLeft" : "StarRight", UiKitBuilder.Star, Color.white, new Vector2(0.5f, 0.5f), new Vector2(side * 470f, 0f), new Vector2(110f, 110f));
+                star.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            var title = Label(ribbonRt, "Title", font, outlineMat, 92, Color.white, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0f, 38f), new Vector2(790f, 120f));
+            title.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            title.enableAutoSizing = true;   // long names ("SANAYİ TAMAMLANDI") shrink to stay between the side stars
+            title.fontSizeMin = 54f;
+            title.fontSizeMax = 92f;
+            var subtitle = Label(ribbonRt, "Subtitle", font, null, 46, new Color(0.17f, 0.13f, 0.2f), TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0f, -66f), new Vector2(880f, 64f));
+            subtitle.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+
+            var burst = new Image[10];
+            for (var i = 0; i < burst.Length; i++)
+            {
+                burst[i] = MakeImage(ribbonRt, $"Burst {i}", UiKitBuilder.Star, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(78f, 78f));
+                burst[i].rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                burst[i].gameObject.SetActive(false);
+            }
+
+            var banner = host.gameObject.AddComponent<CeremonyBanner>();
+            EditorWire.Set(banner, "root", ribbonRt);
+            EditorWire.Set(banner, "group", group);
+            EditorWire.Set(banner, "ribbon", ribbon);
+            EditorWire.Set(banner, "titleRect", title.rectTransform);
+            EditorWire.Set(banner, "title", title);
+            EditorWire.Set(banner, "subtitle", subtitle);
+            EditorWire.SetArray(banner, "burst", burst);
+            return banner;
+        }
+
         // Centred window with a slider for the music level and one for the effects level, over a dimmed screen.
         static SettingsPanel BuildSettings(Transform root, Sprite kit, Sprite buttonSprite, TMP_FontAsset font, AudioManager audioManager, Button openButton)
         {
@@ -665,7 +862,7 @@ namespace Game.Editor
             overlayButton.targetGraphic = dim;
             overlayButton.transition = Selectable.Transition.None;
 
-            var panel = Rect(window, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 470f));
+            var panel = Rect(window, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 600f));
             panel.pivot = new Vector2(0.5f, 0.5f);
             var back = panel.gameObject.AddComponent<Image>();
             back.sprite = kit;
@@ -682,6 +879,11 @@ namespace Game.Editor
             SettingsRow(panel, kit, font, "MÜZİK", -150f, out var musicSlider, out var musicValue);
             SettingsRow(panel, kit, font, "SES", -290f, out var sfxSlider, out var sfxValue);
 
+            var shakeLabelText = Label(panel, "ShakeLabel", font, null, 36, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 1f), new Vector2(44f, -420f), new Vector2(430f, 56f));
+            shakeLabelText.text = "EKRAN SARSINTISI";
+            var shakeButton = TintedButton(panel, "ShakeButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-44f, -412f), new Vector2(210f, 72f),
+                new Color(0.5f, 0.9f, 0.55f), 34, out var shakeStateLabel);
+
             var tip = Label(panel, "Tip", font, null, 26, new Color(1f, 1f, 1f, 0.75f), TextAlignmentOptions.Center, new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(660f, 40f));
             tip.rectTransform.pivot = new Vector2(0.5f, 0f);
             tip.text = "Esc ile de açılır ve kapanır";
@@ -696,6 +898,8 @@ namespace Game.Editor
             EditorWire.Set(settings, "musicValue", musicValue);
             EditorWire.Set(settings, "sfxSlider", sfxSlider);
             EditorWire.Set(settings, "sfxValue", sfxValue);
+            EditorWire.Set(settings, "shakeButton", shakeButton);
+            EditorWire.Set(settings, "shakeLabel", shakeStateLabel);
             window.gameObject.SetActive(false);
             return settings;
         }
@@ -872,14 +1076,14 @@ namespace Game.Editor
             return tmp;
         }
 
-        // Side panel with the four purchases. The ShopPanel component sits on an always-active empty object so it can
-        // keep sliding the (otherwise inactive) panel in and out.
+        // Side panel with two tabs: the upgrades (five cards) and the decorations (six rows). The ShopPanel component sits on an
+        // always-active empty object so it can keep sliding the (otherwise inactive) panel in and out.
         static ShopPanel BuildShop(Transform root, Sprite kit, Sprite buttonSprite, TMP_FontAsset font)
         {
             var host = Rect(root, "Shop", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             var shop = host.gameObject.AddComponent<ShopPanel>();
 
-            var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -150f), new Vector2(520f, 662f));
+            var panelRt = Rect(host, "Panel", new Vector2(1f, 1f), new Vector2(-30f, -150f), new Vector2(520f, 800f));
             var back = panelRt.gameObject.AddComponent<Image>();
             back.sprite = kit;
             back.type = Image.Type.Sliced;
@@ -888,14 +1092,39 @@ namespace Game.Editor
             var title = Label(panelRt, "Title", font, null, 40, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 1f), new Vector2(28f, -20f), new Vector2(300f, 56f));
             title.text = "MAĞAZA";
             var close = TintedButton(panelRt, "CloseButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(64f, 64f),
-                new Color(1f, 0.45f, 0.4f), 36, out var closeLabel);
+                new Color(1f, 0.45f, 0.4f), 38, out var closeLabel);
             closeLabel.text = "X";
 
-            var hammer = ShopCard(panelRt, "HammerButton", buttonSprite, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
-            var worker = ShopCard(panelRt, "WorkerButton", buttonSprite, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
-            var stamina = ShopCard(panelRt, "StaminaButton", buttonSprite, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
-            var speed = ShopCard(panelRt, "SpeedButton", buttonSprite, font, 3, new Color(0.62f, 0.78f, 1f), out var speedLabel);
-            var cola = ShopCard(panelRt, "ColaBuyButton", buttonSprite, font, 4, new Color(1f, 0.55f, 0.3f), out var colaLabel);
+            var upgradesTab = TintedButton(panelRt, "UpgradesTab", buttonSprite, font, new Vector2(0.5f, 1f), new Vector2(-128f, -88f), new Vector2(236f, 66f),
+                new Color(1f, 0.82f, 0.3f), 28, out var upgradesTabLabel);
+            upgradesTabLabel.text = "YÜKSELT";
+            var decorTab = TintedButton(panelRt, "DecorTab", buttonSprite, font, new Vector2(0.5f, 1f), new Vector2(128f, -88f), new Vector2(236f, 66f),
+                new Color(0.78f, 0.74f, 0.9f), 24, out var decorTabLabel);
+            decorTabLabel.textWrappingMode = TextWrappingModes.Normal;
+            decorTabLabel.text = "GÜZELLEŞTİR";
+            foreach (var pivot in new[] { upgradesTab.GetComponent<RectTransform>(), decorTab.GetComponent<RectTransform>() }) pivot.pivot = new Vector2(0.5f, 1f);
+
+            // --- upgrades tab
+            var upgrades = Rect(panelRt, "Upgrades", new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            Stretch(upgrades, 0f, 0f);
+            var hammer = ShopCard(upgrades, "HammerButton", buttonSprite, font, 0, new Color(1f, 0.79f, 0.24f), out var hammerLabel);
+            var worker = ShopCard(upgrades, "WorkerButton", buttonSprite, font, 1, new Color(0.45f, 0.82f, 1f), out var workerLabel);
+            var stamina = ShopCard(upgrades, "StaminaButton", buttonSprite, font, 2, new Color(0.55f, 0.9f, 0.55f), out var staminaLabel);
+            var speed = ShopCard(upgrades, "SpeedButton", buttonSprite, font, 3, new Color(0.62f, 0.78f, 1f), out var speedLabel);
+            var cola = ShopCard(upgrades, "ColaBuyButton", buttonSprite, font, 4, new Color(1f, 0.55f, 0.3f), out var colaLabel);
+
+            // --- decorations tab
+            var decor = Rect(panelRt, "Decorations", new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            Stretch(decor, 0f, 0f);
+            var header = Label(decor, "Header", font, null, 28, Color.white, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0f, -166f), new Vector2(480f, 40f));
+            header.rectTransform.pivot = new Vector2(0.5f, 1f);
+            var decorButtons = new Button[Balance.DecorationCount];
+            var decorLabels = new TMP_Text[Balance.DecorationCount];
+            for (var i = 0; i < decorButtons.Length; i++)
+            {
+                decorButtons[i] = ShopCard(decor, $"Decoration{i + 1}Button", buttonSprite, font, i, Color.white, out decorLabels[i], top: 214f, step: 92f, height: 84f);
+                decorLabels[i].fontSize = 26;
+            }
 
             EditorWire.Set(shop, "panel", panelRt);
             EditorWire.Set(shop, "closeButton", close);
@@ -909,13 +1138,23 @@ namespace Game.Editor
             EditorWire.Set(shop, "speedLabel", speedLabel);
             EditorWire.Set(shop, "colaBuyButton", cola);
             EditorWire.Set(shop, "colaBuyLabel", colaLabel);
+            EditorWire.Set(shop, "upgradesGroup", upgrades.gameObject);
+            EditorWire.Set(shop, "decorGroup", decor.gameObject);
+            EditorWire.Set(shop, "upgradesTab", upgradesTab);
+            EditorWire.Set(shop, "decorTab", decorTab);
+            EditorWire.Set(shop, "decorTabLabel", decorTabLabel);
+            EditorWire.Set(shop, "decorHeader", header);
+            EditorWire.SetArray(shop, "decorButtons", decorButtons);
+            EditorWire.SetArray(shop, "decorLabels", decorLabels);
+            decor.gameObject.SetActive(false);
             panelRt.gameObject.SetActive(false);
             return shop;
         }
 
-        static Button ShopCard(Transform parent, string name, Sprite sprite, TMP_FontAsset font, int row, Color tint, out TMP_Text label)
+        static Button ShopCard(Transform parent, string name, Sprite sprite, TMP_FontAsset font, int row, Color tint, out TMP_Text label,
+            float top = 168f, float step = 114f, float height = 104f)
         {
-            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 1f), new Vector2(0f, -88f - row * 114f), new Vector2(472f, 104f), tint, 27, out label);
+            var button = TintedButton(parent, name, sprite, font, new Vector2(0.5f, 1f), new Vector2(0f, -top - row * step), new Vector2(472f, height), tint, 27, out label);
             label.textWrappingMode = TextWrappingModes.Normal;
             return button;
         }

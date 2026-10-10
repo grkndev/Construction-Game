@@ -18,5 +18,9 @@ namespace Game.Core
         Enter,
         Exit,
         Click,
+        DistrictDone,   // fanfare when the last building of a district is finished
+        Stamp,          // the "stamp" thud of the district banner
+        CoinLand,       // a flying coin reaches the purse (tiny, throttled)
+        Chirp,          // startled birds
     }
 }

@@ -13,6 +13,8 @@ namespace Game.World
         [SerializeField] Transform playerSpawn;
         [SerializeField] Transform workerSpawn;
         [SerializeField] Transform mapPoint;
+        [SerializeField] Transform[] decorationSlots;   // where the six decorations go, in building order
+        [SerializeField] FeelFx fx;                // dust, floor rings, sparkles and fireworks of this district
         [SerializeField] float halfSize = 26f;     // the play area is a square of 2 * halfSize
         [SerializeField] float borderInset = 0.8f; // the player stops this far inside the square, in front of the fence
 
@@ -21,12 +23,22 @@ namespace Game.World
         public Vector3 PlayerSpawn => playerSpawn.position;
         public Vector3 WorkerSpawn => workerSpawn.position;
         public float HalfSize => halfSize;
+        public FeelFx Fx => fx;
+        public Transform DecorationSlot(int index) => decorationSlots[index];
         /// <summary>The district's centre on the country map (world space), where its card is shown.</summary>
         public Vector3 MapPoint => mapPoint.position;
 
         public void SetVisible(bool visible)
         {
             if (gameObject.activeSelf != visible) gameObject.SetActive(visible);
+        }
+
+        /// <summary>True when the point is within <paramref name="radius"/> of a decoration slot (they stand on those spots).</summary>
+        public bool IsNearDecoration(Vector3 point, float radius)
+        {
+            foreach (var slot in decorationSlots)
+                if (Vector3.ProjectOnPlane(slot.position - point, Vector3.up).magnitude < radius) return true;
+            return false;
         }
 
         /// <summary>The nearest point of the play area (world space, y kept).</summary>

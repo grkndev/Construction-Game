@@ -21,6 +21,9 @@ namespace Game.Core
         /// <summary>Index 0 is "no problem"; 1..<see cref="Balance.RepairKinds"/> match <see cref="DistrictState.Issues"/>.</summary>
         public static readonly string[] IssueNames = { "", "Çatı sızıntısı", "Kırık boru", "Bozuk elektrik", "Çatlak duvar" };
 
+        /// <summary>The six decorations of a district, in the order they are built (see <see cref="Balance.DecorationCount"/>).</summary>
+        public static readonly string[] DecorationNames = { "Çiçeklik", "Bank ve Lamba", "Küçük Park", "Fıskiye", "Çardak", "Heykel" };
+
         static readonly string[] Thanks = { "Teşekkürler!", "Eline sağlık!", "Harika iş!", "Çok yaşa!" };
 
         public static string ThanksLine(int seed) => Thanks[((seed % Thanks.Length) + Thanks.Length) % Thanks.Length];

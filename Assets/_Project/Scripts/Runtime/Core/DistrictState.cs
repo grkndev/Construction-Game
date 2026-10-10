@@ -22,6 +22,7 @@ namespace Game.Core
         public int[] RepairWork { get; }
         public float RepairClock { get; set; }
         public bool IntroSeen { get; set; }
+        public DecorationProgress Decorations { get; } = new DecorationProgress();
 
         public int PlotCount => Def.Plans.Length;
 
@@ -106,6 +107,9 @@ namespace Game.Core
             repairWork = (int[])RepairWork.Clone(),
             repairClock = RepairClock,
             introSeen = IntroSeen,
+            decorationsBuilt = Decorations.Built,
+            decorationOrdered = Decorations.Ordered,
+            decorationProgress = Decorations.Progress,
         };
 
         /// <summary>Applies a save; missing or short arrays (older saves, new plots) are tolerated.</summary>
@@ -125,6 +129,7 @@ namespace Game.Core
             }
             RepairClock = Math.Max(0f, save.repairClock);
             IntroSeen = save.introSeen;
+            Decorations.Restore(save.decorationsBuilt, save.decorationOrdered, save.decorationProgress);
         }
 
         static int Get(int[] values, int i) => values != null && i < values.Length ? values[i] : 0;

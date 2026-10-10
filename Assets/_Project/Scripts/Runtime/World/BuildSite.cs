@@ -38,6 +38,7 @@ namespace Game.World
         Renderer markerRenderer;
         readonly List<Transform> floors = new List<Transform>();
         float punch;
+        float barPulse;   // 1 right after a floor is built, fades to 0 (the progress bar swells)
 
         public BuildPlan Plan => plan;
         public SiteState State => state;
@@ -52,7 +53,7 @@ namespace Game.World
 
         public event Action<BuildSite> Completed;
         /// <summary>A floor just appeared (not raised when a saved building is restored).</summary>
-        public event Action<BuildSite> FloorBuilt;
+        public event Action<BuildSite, int> FloorBuilt;   // with the floor number, counting from 1
 
         /// <summary>How many auto-workers currently work here; the dispatcher sends new ones to the emptiest plot.</summary>
         public int AssignedWorkers { get; private set; }
@@ -244,6 +245,26 @@ namespace Game.World
             return applied;
         }
 
+        /// <summary>A short swell of the progress bar (called when a floor is built).</summary>
+        public void PulseBar() => barPulse = 1f;
+
+        /// <summary>The middle of the building's base and how far it reaches, for effects that surround it (floor rings, sparkles).</summary>
+        public Vector3 BasePoint => transform.position;
+        /// <summary>Half the footprint (x, z): the finished building stands within this rectangle around the plot's centre.</summary>
+        public Vector2 FootprintHalf => footprint * 0.5f;
+
+        /// <summary>A spot just outside the building's wall in the given flat direction, <paramref name="gap"/> away from it.</summary>
+        public Vector3 SpotOutside(Vector3 direction, float gap)
+        {
+            var dir = new Vector2(direction.x, direction.z);
+            if (dir.sqrMagnitude < 1e-6f) dir = Vector2.up;
+            var distance = Core.FootprintMath.EdgeDistance(FootprintHalf, dir) + gap;
+            var flat = dir.normalized * distance;
+            return transform.position + new Vector3(flat.x, 0f, flat.y);
+        }
+
+        public float EffectRadius => Mathf.Max(footprint.x, footprint.y) * 0.55f;
+
         void SetBarFraction(float f)
         {
             barFill.localScale = new Vector3(Mathf.Max(0.0001f, f), 1f, 1f);
@@ -254,7 +275,7 @@ namespace Game.World
             var floor = floors[floorNumber - 1];
             floor.gameObject.SetActive(true);
             StartCoroutine(PopIn(floor, 0.5f));
-            FloorBuilt?.Invoke(this);
+            FloorBuilt?.Invoke(this, floorNumber);
         }
 
         void OnCompleted()
@@ -287,6 +308,12 @@ namespace Game.World
             var s = Mathf.Sin(punch * Mathf.PI);
             body.localScale = new Vector3(1f + s * 0.05f, 1f - s * 0.06f, 1f + s * 0.05f);
 
+            if (barPulse > 0f)
+            {
+                barPulse = Mathf.MoveTowards(barPulse, 0f, Time.deltaTime * 3.5f);
+                barRoot.localScale = Vector3.one * (1f + 0.35f * Mathf.Sin(barPulse * Mathf.PI));
+            }
+
             if (marker != null && marker.gameObject.activeSelf)
             {
                 marker.localPosition = new Vector3(0f, 1.5f + Mathf.Sin(Time.time * 4f) * 0.18f, 0f);
@@ -297,10 +324,9 @@ namespace Game.World
         /// <summary>Where the nth auto-worker should stand (spread around the building).</summary>
         public Vector3 WorkSlot(int n)
         {
+            // Around the plot, a fixed gap outside the wall in that direction (an ellipse put the corner slots of wide buildings inside the walls).
             var angle = (n * 137.5f + 200f) * Mathf.Deg2Rad;
-            var p = transform.position + new Vector3(Mathf.Cos(angle) * (footprint.x * 0.5f + 1.3f), 0f, Mathf.Sin(angle) * (footprint.y * 0.5f + 1.3f));
-            p.y = 0f;
-            return p;
+            return SpotOutside(new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)), 1.3f);
         }
     }
 }

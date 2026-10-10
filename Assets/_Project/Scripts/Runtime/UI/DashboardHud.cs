@@ -20,8 +20,9 @@ namespace Game.UI
         [SerializeField] Button nextWorld;
         [SerializeField] UiPlate tipPlate;
 
-        static readonly Color Open = new Color(1f, 0.86f, 0.35f);
+        static readonly Color Open = new Color(1f, 0.76f, 0.25f);
         static readonly Color Done = new Color(0.5f, 0.92f, 0.55f);
+        static readonly Color Gold = new Color(1f, 0.97f, 0.55f);
         static readonly Color Locked = new Color(0.72f, 0.7f, 0.78f);
 
         GameController game;
@@ -65,8 +66,13 @@ namespace Game.UI
                 if (!game.IsUnlocked(i))
                     cards[i].Show(def.Name, $"Seviye {def.RequiredLevel}", Locked, locked: true);
                 else if (state.IsComplete)
-                    cards[i].Show(def.Name, state.IssueCount > 0 ? $"Tamamlandı  •  {state.IssueCount} sorun" : "Tamamlandı",
-                        state.IssueCount > 0 ? Open : Done, locked: false);
+                {
+                    // A finished district shows its beautifying: stars for the decorations, and a golden card when all six stand.
+                    var deco = state.Decorations;
+                    var status = deco.IsComplete ? "ALTIN YILDIZ" : deco.Built > 0 ? $"Tamamlandı  •  Süs {deco.Built}/{Balance.DecorationCount}" : "Tamamlandı";
+                    if (state.IssueCount > 0) status += $"  •  {state.IssueCount} sorun";
+                    cards[i].Show(def.Name, status, deco.IsComplete ? Gold : state.IssueCount > 0 ? Open : Done, locked: false);
+                }
                 else
                     cards[i].Show(def.Name, $"{state.CompletedCount}/{state.PlotCount} bina  %{Mathf.FloorToInt(state.Fraction * 100f)}", Open, locked: false);
             }

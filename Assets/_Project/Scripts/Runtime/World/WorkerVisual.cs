@@ -13,6 +13,7 @@ namespace Game.World
         [SerializeField] Transform body;
         [SerializeField] Transform hammerPivot;
         [SerializeField] Transform aura;     // spinning ring at the feet while the cola level bonus is active
+        [SerializeField] Material[] headMaterials;   // hammer head material per band (see HammerLook), stone first
 
         float move;
         float tired;        // 0..1 smoothed
@@ -20,9 +21,48 @@ namespace Game.World
         bool isBuffed;
         float swingTime = -1f;
         float swingDuration = DefaultSwingDuration;
+        float leanSmooth;
+        Core.IdleEmote emote;
+        float emoteTime;
+        int hops;                 // hops left in a cheer (Cheer() sets several)
+        float restAngle = -35f;   // hammer angle while idle (smoothed)
         Vector3 bodyBasePos;
 
-        void Awake() => bodyBasePos = body.localPosition;
+        Transform hammerHead;
+        Vector3 hammerHeadBaseScale;
+
+        void Awake()
+        {
+            bodyBasePos = body.localPosition;
+            hammerHead = hammerPivot.Find("Head");
+            if (hammerHead != null) hammerHeadBaseScale = hammerHead.localScale;
+        }
+
+        /// <summary>The hammer head grows and changes material as the hammer is upgraded.</summary>
+        public void SetHammerTier(int tier)
+        {
+            if (hammerHead == null) return;
+            hammerHead.localScale = hammerHeadBaseScale * HammerLookScale(tier);
+            if (headMaterials == null || headMaterials.Length == 0) return;
+            hammerHead.GetComponent<Renderer>().sharedMaterial = headMaterials[Mathf.Min(Core.HammerLook.Band(tier), headMaterials.Length - 1)];
+        }
+
+        static float HammerLookScale(int tier) => Core.HammerLook.HeadScale(tier);
+
+        /// <summary>Gives a helper their own shirt and hat colour (null keeps the original).</summary>
+        public void SetLook(Material shirt, Material hat)
+        {
+            Paint("Torso", shirt);
+            Paint("Hat", hat);
+            Paint("HatBrim", hat);
+        }
+
+        void Paint(string part, Material material)
+        {
+            if (material == null) return;
+            var found = body.Find(part);
+            if (found != null) found.GetComponent<Renderer>().sharedMaterial = material;
+        }
 
         /// <summary>0 = standing, 1 = full speed.</summary>
         public void SetMove(float amount01) => move = Mathf.Lerp(move, amount01, 12f * Time.deltaTime);
@@ -34,6 +74,22 @@ namespace Game.World
             swingTime = 0f;
         }
 
+        /// <summary>A short idle gesture: look about, rest the hammer on the shoulder (until the next move) or hop once.</summary>
+        public void Emote(Core.IdleEmote kind)
+        {
+            emote = kind;
+            emoteTime = 0f;
+            if (kind == Core.IdleEmote.Hop) hops = 1;
+        }
+
+        /// <summary>Celebrates: three hops with the hammer raised.</summary>
+        public void Cheer()
+        {
+            emote = Core.IdleEmote.Hop;
+            emoteTime = 0f;
+            hops = 3;
+        }
+
         /// <summary>Slumps forward and pants while the player's energy is exhausted.</summary>
         public void SetTired(bool value) => isTired = value;
 
@@ -42,14 +98,39 @@ namespace Game.World
 
         void Update()
         {
-            var bob = Mathf.Abs(Mathf.Sin(Time.time * 11f)) * 0.1f * move;
+            if (move > 0.25f && emote != Core.IdleEmote.None && emote != Core.IdleEmote.Hop) emote = Core.IdleEmote.None;   // walking ends a rest or a look
+
+            var hop = 0f;
+            var look = 0f;
+            var targetRest = -35f;
+            if (emote != Core.IdleEmote.None)
+            {
+                emoteTime += Time.deltaTime;
+                switch (emote)
+                {
+                    case Core.IdleEmote.Look:
+                        look = Mathf.Sin(emoteTime * 2.2f) * 38f;
+                        break;
+                    case Core.IdleEmote.Rest:
+                        targetRest = -75f;   // hammer on the shoulder
+                        break;
+                    case Core.IdleEmote.Hop:
+                        targetRest = -125f;   // hammer raised
+                        var hopTime = emoteTime / 0.42f;
+                        if (hopTime >= hops) { emote = Core.IdleEmote.None; hops = 0; }
+                        else hop = Mathf.Abs(Mathf.Sin(hopTime * Mathf.PI)) * 0.55f;
+                        break;
+                }
+            }
+            restAngle = Mathf.Lerp(restAngle, targetRest, 10f * Time.deltaTime);
+
+            var bob = Mathf.Abs(Mathf.Sin(Time.time * 11f)) * 0.1f * move + hop;
             var squash = 1f + Mathf.Sin(Time.time * 22f) * 0.03f * move;
             body.localPosition = bodyBasePos + Vector3.up * bob;
             body.localScale = new Vector3(1f / Mathf.Sqrt(squash), squash, 1f / Mathf.Sqrt(squash));
 
             tired = Mathf.MoveTowards(tired, isTired ? 1f : 0f, 4f * Time.deltaTime);
             var pant = Mathf.Sin(Time.time * 14f) * 2f * tired;
-            body.localRotation = Quaternion.Euler(tired * 18f + pant, 0f, 0f);
 
             if (aura != null)
             {
@@ -57,17 +138,34 @@ namespace Game.World
                 if (isBuffed) aura.Rotate(0f, 240f * Time.deltaTime, 0f, Space.Self);
             }
 
-            // Resting pose holds the hammer up; a swing goes up-back then slams down.
-            var angle = -35f;
+            // Resting pose holds the hammer up. A swing is: a quick wind-up past the resting pose (anticipation), a fast accelerating slam,
+            // a small rebound off the impact, then settling back. The body leans into the slam.
+            var angle = restAngle;
+            var lean = emote == Core.IdleEmote.Rest ? -6f : 0f;
             if (swingTime >= 0f)
             {
                 swingTime += Time.deltaTime;
                 var t = swingTime / swingDuration;
                 if (t >= 1f) swingTime = -1f;
-                else angle = t < 0.35f
-                    ? Mathf.Lerp(-35f, -110f, Core.Easing.OutCubic(t / 0.35f))
-                    : Mathf.Lerp(-110f, 70f, Core.Easing.OutCubic((t - 0.35f) / 0.65f));
+                else if (t < 0.2f)
+                {
+                    angle = Mathf.Lerp(-35f, -115f, Core.Easing.OutCubic(t / 0.2f));
+                }
+                else if (t < 0.5f)
+                {
+                    var k = (t - 0.2f) / 0.3f;
+                    angle = Mathf.Lerp(-115f, 78f, k * k);      // accelerates into the hit
+                    lean = Mathf.Lerp(0f, 9f, k);
+                }
+                else
+                {
+                    var k = Core.Easing.OutCubic((t - 0.5f) / 0.5f);
+                    angle = Mathf.Lerp(78f, -35f, k) + Mathf.Sin(k * Mathf.PI) * -14f;   // rebound, then back to rest
+                    lean = Mathf.Lerp(9f, 0f, k);
+                }
             }
+            leanSmooth = Mathf.Lerp(leanSmooth, lean, 25f * Time.deltaTime);
+            body.localRotation = Quaternion.Euler(tired * 18f + pant + leanSmooth, look, 0f);
             hammerPivot.localRotation = Quaternion.Euler(angle, 0f, 0f);
         }
     }

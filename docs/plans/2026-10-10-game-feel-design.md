@@ -1,5 +1,7 @@
 # Oyun hissi ve büyük anlar — tasarım (Faz 1)
 
+> Durum: **uygulandı** (bkz. `CLAUDE.md` "Oyun hissi"). Planlanandan sapmalar: havai fişek `FeelFx` içinde (ayrı `Fireworks` sınıfı yok); bina boyunca ışık süpürmesi yerine parıltı sütunu.
+
 Sıra (kullanıcı onayı): **1) his + büyük anlar**, 2) sıradaki hedef çubuğu, 3) tekdüzeliği kıran çeşitlilik.
 Bu belge yalnızca Faz 1'i kapsar. Genel ilke: oyun sade ve baskısız kalır (süre/ceza/görev listesi yok, bkz. `CLAUDE.md`).
 

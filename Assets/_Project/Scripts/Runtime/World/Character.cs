@@ -45,6 +45,9 @@ namespace Game.World
             energyBar.SetWidthScale(1f + (settings.Max / BaseSettings.Max - 1f) * 0.6f);   // half-way: visible, but not huge
         }
 
+        /// <summary>Hammer upgrade: the hammer head grows and changes material.</summary>
+        public void ApplyHammerTier(int tier) => visual.SetHammerTier(tier);
+
         /// <summary>Called by the game when a cola effect starts or ends.</summary>
         public void SetBuffs(bool levelBonus, float speedMultiplier)
         {

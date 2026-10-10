@@ -43,6 +43,10 @@ namespace Game.Editor
                 case SfxKind.Enter: return AudioSynth.Enter();
                 case SfxKind.Exit: return AudioSynth.Exit();
                 case SfxKind.Click: return AudioSynth.Click();
+                case SfxKind.DistrictDone: return AudioSynth.DistrictDone();
+                case SfxKind.Stamp: return AudioSynth.Stamp();
+                case SfxKind.CoinLand: return AudioSynth.CoinLand();
+                case SfxKind.Chirp: return AudioSynth.Chirp();
                 default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
         }

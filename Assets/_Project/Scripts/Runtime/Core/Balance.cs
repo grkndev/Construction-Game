@@ -130,6 +130,34 @@ namespace Game.Core
         public static long ColaPrice(int hammerLevel, int workers, int speedLevel, int scale) =>
             Math.Max(60L * scale, (long)Math.Round(ColaPriceSeconds * EstimatedIncomePerSecond(hammerLevel, workers, speedLevel, scale)));
 
+        // ---- Decorations: once a district is finished the player can beautify it, one decoration after another (the shop's "Güzelleştir" tab).
+        // Prices are paid with the district's own coins and scale like everything else; every finished decoration then brings a small tourist income,
+        // so the next one pays for itself after a couple of minutes. Numbers below are first-district values.
+        public const int DecorationCount = 6;
+        public static readonly long[] DecorationBaseCosts = { 150, 260, 420, 650, 950, 1500 };
+        public const float DecorationBuildSeconds = 8f;      // one helper working alone
+        public const float TouristTipSeconds = 4f;           // tourists tip in batches this often
+        const double TouristIncomePerDecoration = 2.0;       // coins per second per decoration (first district)
+
+        public static long DecorationCost(int index, int scale) => DecorationBaseCosts[Math.Max(0, Math.Min(index, DecorationCount - 1))] * scale;
+
+        /// <summary>Coins per second all finished decorations of a district bring together: a little more than linear, so each one is worth the wait.</summary>
+        public static double TouristIncome(int built, int scale) =>
+            built <= 0 ? 0.0 : scale * TouristIncomePerDecoration * built * (1.0 + 0.15 * (built - 1));
+
+        // ---- Small events (see EventPicker): rewards are worth a few seconds of what the district earns, so they stay a treat at every stage.
+        public const float ChestIncomeSeconds = 30f, PetIncomeSeconds = 8f, BirdTipIncomeSeconds = 3f;
+
+        /// <summary>Coins in a treasure chest: about half a minute of normal income (never less than a small floor).</summary>
+        public static long ChestReward(int hammerLevel, int workers, int speedLevel, int scale) => EventReward(ChestIncomeSeconds, hammerLevel, workers, speedLevel, scale, 40);
+
+        public static long PetReward(int hammerLevel, int workers, int speedLevel, int scale) => EventReward(PetIncomeSeconds, hammerLevel, workers, speedLevel, scale, 12);
+
+        public static long BirdTip(int hammerLevel, int workers, int speedLevel, int scale) => EventReward(BirdTipIncomeSeconds, hammerLevel, workers, speedLevel, scale, 5);
+
+        static long EventReward(float seconds, int hammerLevel, int workers, int speedLevel, int scale, int floor) =>
+            Math.Max(floor * (long)scale, (long)Math.Round(seconds * EstimatedIncomePerSecond(hammerLevel, workers, speedLevel, scale)));
+
         // ---- Speed upgrade: a character's whole pace (walking, swinging and recovering energy) gets faster.
         public const int MaxSpeedLevel = 5;
         public const float SpeedPerLevel = 0.15f;

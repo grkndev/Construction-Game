@@ -248,6 +248,47 @@ namespace Game.Editor
 
         static int Samples(double seconds) => (int)Math.Ceiling(seconds * Rate);
 
+        /// <summary>Fanfare for a finished district: a rising run, then a full major chord with glitter.</summary>
+        public static float[] DistrictDone()
+        {
+            var mix = new float[Samples(1.95)];
+            var run = new[] { 67, 72, 76, 79, 84 };
+            for (var i = 0; i < run.Length; i++) Mix(mix, i * 0.12, Bell(Hz(run[i]), 0.7, 4.5), 0.5f);
+            foreach (var n in new[] { 60, 64, 67, 72 }) Mix(mix, 0.55, Pluck(Hz(n), 1.4, 2.2), 0.26f);
+            foreach (var n in new[] { 72, 76, 79, 84, 88 }) Mix(mix, 0.55, Bell(Hz(n), 1.3, 2.8), 0.3f);
+            Mix(mix, 0.55, HighNoise(0.8, 4.0, seed: 41), 0.07f);
+            return Normalize(mix, 0.88f);
+        }
+
+        /// <summary>The thud of a stamp landing: a low sweep, a kick and a short noise burst.</summary>
+        public static float[] Stamp()
+        {
+            var mix = new float[Samples(0.5)];
+            Mix(mix, 0.0, Sweep(180.0, 55.0, 0.35, 9.0), 0.8f);
+            Mix(mix, 0.0, Kick(), 0.5f);
+            Mix(mix, 0.0, LowNoise(0.18, 0.4, 14.0, seed: 43), 0.35f);
+            return Normalize(mix, 0.85f);
+        }
+
+        /// <summary>Three quick rising chirps.</summary>
+        public static float[] Chirp()
+        {
+            var mix = new float[Samples(0.4)];
+            Mix(mix, 0.00, Sweep(2200.0, 3300.0, 0.09, 20.0), 0.6f);
+            Mix(mix, 0.11, Sweep(2600.0, 3600.0, 0.08, 22.0), 0.55f);
+            Mix(mix, 0.21, Sweep(2400.0, 3000.0, 0.07, 24.0), 0.5f);
+            return Normalize(mix, 0.6f);
+        }
+
+        /// <summary>A very small, bright tick for a coin reaching the purse.</summary>
+        public static float[] CoinLand()
+        {
+            var mix = new float[Samples(0.22)];
+            Mix(mix, 0.0, Bell(Hz(91), 0.2, 16.0), 0.6f);
+            Mix(mix, 0.025, Bell(Hz(96), 0.18, 18.0), 0.35f);
+            return Normalize(mix, 0.7f);
+        }
+
         public static double Hz(int midiNote) => 440.0 * Math.Pow(2.0, (midiNote - 69) / 12.0);
 
         // Mallet-like bell: a sine with two quickly dying overtones.

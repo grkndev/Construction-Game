@@ -26,6 +26,8 @@ namespace Game.Editor
         {
             public GameObject Root;
             public Transform[] Anchors;
+            public Game.Feel.MapFlags Flags;
+            public FeelFx Fx;
         }
 
         public static List<Vector2> Outline() => MapGeometry.CountryOutline(RadiusU, RadiusV, 22);
@@ -54,6 +56,7 @@ namespace Game.Editor
             var anchors = new Transform[provinces.Length];
             var random = new System.Random(5);
             var trees = new List<Vector3>();
+            var flagObjects = new Transform[provinces.Length];
             for (var i = 0; i < provinces.Length; i++)
             {
                 var centre = MapGeometry.Centroid(provinces[i]);
@@ -68,10 +71,29 @@ namespace Game.Editor
 
                 var outward = Mathf.Atan2(centre.y, centre.x) * Mathf.Rad2Deg;
                 GameSceneBuilder.BuildLandmark(root, p, i, new Vector3(landmarkSpot.x, 0f, landmarkSpot.y), outward, 1.9f, onLand: true);
+                var beside = landmarkSpot + ToWorld(new Vector2(1f, 0f)) * 6.5f;
+                flagObjects[i] = BuildFlag(root, p, new Vector3(beside.x, 0f, beside.y), i);
                 Scatter(trees, provinces[i], new[] { landmarkSpot, cardSpot }, random, 26);
             }
             GameSceneBuilder.BuildForest(root, trees, p);
-            return new Result { Root = root.gameObject, Anchors = anchors };
+
+            var flags = root.gameObject.AddComponent<Game.Feel.MapFlags>();
+            EditorWire.SetArray(flags, "flags", flagObjects);
+            EditorWire.Set(flags, "gold", p.yellow);
+            return new Result { Root = root.gameObject, Anchors = anchors, Flags = flags, Fx = GameSceneBuilder.BuildFeelFx(root) };
+        }
+
+        // A pole with a red cloth, shown once the district is finished (see Game.Feel.MapFlags).
+        static Transform BuildFlag(Transform parent, ToonPalette p, Vector3 position, int index)
+        {
+            var flag = new GameObject($"Flag {Balance.Districts[index].Name}").transform;
+            flag.SetParent(parent, false);
+            flag.localPosition = position;
+            Prim.Cylinder(flag, "Pole", new Vector3(0f, 3.4f, 0f), new Vector3(0.28f, 3.4f, 0.28f), p.scaffold);
+            Prim.Cube(flag, "Cloth", new Vector3(1.5f, 5.7f, 0f), new Vector3(3f, 1.8f, 0.14f), p.flag);
+            Prim.Sphere(flag, "Knob", new Vector3(0f, 6.9f, 0f), Vector3.one * 0.5f, p.yellow);
+            flag.gameObject.SetActive(false);
+            return flag;
         }
 
         // Trees at random spots well inside a province, away from its landmark and its card.

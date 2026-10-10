@@ -32,5 +32,8 @@ namespace Game.Core
         public int[] repairWork = new int[0];    // per plot: repair progress
         public float repairClock;                // seconds towards the next problem
         public bool introSeen;
+        public int decorationsBuilt;          // finished decorations (older saves: 0)
+        public bool decorationOrdered;        // one is being built
+        public float decorationProgress;
     }
 }

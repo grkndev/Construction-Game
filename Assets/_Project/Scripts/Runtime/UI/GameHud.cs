@@ -17,10 +17,8 @@ namespace Game.UI
         [SerializeField] RectTransform audioGroup;   // music / effects switches: top-right, shifted left of the map button inside a district
         [SerializeField] UiPlate buildingPlate;
         [SerializeField] UiPlate hintPlate;
-        [SerializeField] UiPlate victoryPlate;
         [SerializeField] UiPlate boostPlate;
         [SerializeField] GameObject districtGroup;     // everything that only makes sense inside a district
-        [SerializeField] UiPlate levelPlate;
         [SerializeField] Button exitButton;
         [SerializeField] TMP_Text levelLabel;
         [SerializeField] RectTransform levelFill;
@@ -40,8 +38,6 @@ namespace Game.UI
 
         GameController game;
         float hintTimer;
-        float levelTimer;
-        float victoryTimer;
 
         public void Bind(GameController controller)
         {
@@ -49,8 +45,6 @@ namespace Game.UI
             game.CoinsChanged += Refresh;
             game.StateChanged += Refresh;
             game.ModeChanged += OnModeChanged;
-            game.LeveledUp += OnLeveledUp;
-            game.CityCompleted += OnCityCompleted;
             game.Level.Changed += Refresh;
             game.Hint += ShowHint;
             game.Story += ShowHint;
@@ -58,9 +52,7 @@ namespace Game.UI
             shop.Bind(game);
             shopButton.onClick.AddListener(shop.Toggle);
             exitButton.onClick.AddListener(game.ExitToDashboard);
-            levelPlate.Text = "";
             colaUseButton.onClick.AddListener(game.UseCola);
-            victoryPlate.Text = "";
 
             OnModeChanged();
             Refresh();
@@ -83,29 +75,12 @@ namespace Game.UI
             }
         }
 
-        // The big congratulation is shown once, for a few seconds, and then goes away.
-        void OnCityCompleted()
-        {
-            victoryPlate.Text = "Şehir tamamlandı!\nHarika iş çıkardın";
-            victoryPlate.Alpha = 1f;
-            victoryTimer = 6f;
-        }
-
-        void OnLeveledUp(int level)
-        {
-            levelPlate.Text = $"SEVİYE {level}!";
-            levelPlate.Alpha = 1f;
-            levelTimer = 2.5f;
-        }
-
         void OnDestroy()
         {
             if (game == null) return;
             game.CoinsChanged -= Refresh;
             game.StateChanged -= Refresh;
             game.ModeChanged -= OnModeChanged;
-            game.LeveledUp -= OnLeveledUp;
-            game.CityCompleted -= OnCityCompleted;
             game.Level.Changed -= Refresh;
             game.Hint -= ShowHint;
             game.Story -= ShowHint;
@@ -118,6 +93,20 @@ namespace Game.UI
             hintPlate.Text = text;
             hintPlate.Alpha = 1f;
             hintTimer = seconds;
+        }
+
+        // The coin counter counts up towards coinTarget instead of jumping.
+        double coinShown;
+        long coinTarget;
+        int coinsDistrict = -2;
+        long lastCoinText = -1;
+
+        void ShowCoins()
+        {
+            var value = (long)coinShown;
+            if (value == lastCoinText) return;
+            lastCoinText = value;
+            coinsText.text = NumberFormat.Compact(value);
         }
 
         // What the polled labels last showed (see Update).
@@ -135,21 +124,13 @@ namespace Game.UI
                 if (hintTimer <= 0f) hintPlate.Text = "";
             }
 
-            if (levelTimer > 0f)
-            {
-                levelTimer -= Time.deltaTime;
-                levelPlate.Alpha = Mathf.Clamp01(levelTimer * 2f);
-                if (levelTimer <= 0f) levelPlate.Text = "";
-            }
-
-            if (victoryTimer > 0f)
-            {
-                victoryTimer -= Time.deltaTime;
-                victoryPlate.Alpha = Mathf.Clamp01(victoryTimer);
-                if (victoryTimer <= 0f) victoryPlate.Text = "";
-            }
-
             if (!game.InDistrict) return;
+
+            if (coinShown < coinTarget)
+            {
+                coinShown = System.Math.Min(coinTarget, coinShown + System.Math.Max(1.0, (coinTarget - coinShown) * System.Math.Min(1.0, Time.unscaledDeltaTime * 7.0)));
+                ShowCoins();
+            }
 
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
             var energy = game.PlayerEnergy;
@@ -201,7 +182,11 @@ namespace Game.UI
 
         void Refresh()
         {
-            coinsText.text = NumberFormat.Compact(game.Economy.Coins);
+            // The counter climbs to the new amount (the coins are still flying); spending or switching to another district's purse snaps at once.
+            var coins = game.Economy.Coins;
+            if (game.CurrentIndex != coinsDistrict || coins < coinTarget) { coinsDistrict = game.CurrentIndex; coinShown = coins; }
+            coinTarget = coins;
+            ShowCoins();
 
             var level = game.Level;
             levelLabel.text = level.IsMax ? $"SEVİYE {level.Level}  (EN YÜKSEK)" : $"SEVİYE {level.Level}   {level.XpIntoLevel}/{level.XpForLevel}";

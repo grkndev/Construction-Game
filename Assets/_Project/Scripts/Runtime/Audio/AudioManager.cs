@@ -1,4 +1,5 @@
 using Game.Core;
+using Game.World;
 using UnityEngine;
 
 namespace Game.Audio
@@ -19,6 +20,7 @@ namespace Game.Audio
         const float SfxVolume = 0.9f;
         const float WorkerHitVolume = 0.28f;
         const float WorkerHitMinGap = 0.11f;
+        const float CoinLandMinGap = 0.07f;
 
         [SerializeField] GameController game;
         [SerializeField] AudioClip[] sfx;               // indexed by SfxKind
@@ -29,6 +31,7 @@ namespace Game.Audio
         AudioSource[] voices;
         int nextVoice;
         float lastWorkerHit = -10f;
+        float lastCoinLand = -10f;
         float musicMix;       // 0 = dashboard track, 1 = district track
         float musicLevel = 1f, sfxLevel = 1f;
         float lastClick = -10f;
@@ -52,6 +55,7 @@ namespace Game.Audio
         void Start()
         {
             game.Sfx += OnSfx;
+            game.FloorBuilt += OnFloorBuilt;
             musicMix = game.InDistrict ? 1f : 0f;
             dashboardSource.Play();
             districtSource.Play();
@@ -60,7 +64,11 @@ namespace Game.Audio
 
         void OnDestroy()
         {
-            if (game != null) game.Sfx -= OnSfx;
+            if (game != null)
+            {
+                game.Sfx -= OnSfx;
+                game.FloorBuilt -= OnFloorBuilt;
+            }
         }
 
         // The level key wins; a save from before levels only has the old on/off switch (off = 0, on = full).
@@ -120,7 +128,10 @@ namespace Game.Audio
 
         void OnSfx(SfxKind kind) => Play(kind);
 
-        void Play(SfxKind kind)
+        // Every floor of a building is a step higher up the scale, so a tall building sounds like climbing stairs.
+        void OnFloorBuilt(BuildSite site, int floor) => Play(SfxKind.FloorBuilt, FloorPitch.Multiplier(floor));
+
+        void Play(SfxKind kind, float pitchOverride = 0f)
         {
             if (sfxLevel <= 0f || (int)kind >= sfx.Length || sfx[(int)kind] == null) return;
 
@@ -142,7 +153,15 @@ namespace Game.Audio
                 case SfxKind.Click:
                     volume = 0.6f;
                     break;
+                case SfxKind.CoinLand:
+                    if (Time.unscaledTime - lastCoinLand < CoinLandMinGap) return;   // a batch of coins arrives within a few frames
+                    lastCoinLand = Time.unscaledTime;
+                    volume = 0.35f;
+                    pitch = Random.Range(0.95f, 1.2f);
+                    break;
             }
+
+            if (pitchOverride > 0f) pitch = pitchOverride;
 
             // Round-robin over a small pool; the oldest sound is cut when all voices are busy.
             var voice = voices[nextVoice];

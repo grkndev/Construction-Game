@@ -53,6 +53,8 @@ namespace Game.Core
         // ---- where the player is
         public GameMode Mode { get; private set; } = GameMode.Dashboard;
         public bool InDistrict => Mode == GameMode.InDistrict;
+        /// <summary>The player (walkers ignore colliding with them).</summary>
+        public Transform PlayerTransform => player.transform;
         public int CurrentIndex { get; private set; } = -1;
         public IReadOnlyList<District> Districts => districts;
         public District CurrentDistrict => InDistrict ? districts[CurrentIndex] : null;
@@ -65,6 +67,8 @@ namespace Game.Core
         public UpgradeTrack Workers => CurrentState.Workers;
         public UpgradeTrack Stamina => CurrentState.Stamina;
         public UpgradeTrack Speed => CurrentState.Speed;
+        /// <summary>Progress of beautifying the district being visited (see <see cref="DecorationProgress"/>).</summary>
+        public DecorationProgress Decorations => CurrentState.Decorations;
         int Scale => CurrentState?.Def.Scale ?? 1;
         public long ColaPrice => Balance.ColaPrice(Hammer.Level, Workers.Tier, Speed.Level, Scale);
         /// <summary>Hammer level including the temporary cola bonus; this is what hits actually use.</summary>
@@ -90,6 +94,23 @@ namespace Game.Core
         /// <summary>Asks the HUD to open/close the shop (keyboard/gamepad shortcut).</summary>
         public event Action ShopToggleRequested;
         public event Action<int> LeveledUp;
+        // ---- what the presentation layer (Game.Feel) listens to; gameplay never depends on anyone listening.
+        /// <summary>A hammer hit landed and paid coins (not raised for repairs).</summary>
+        public event Action<HitInfo> HitLanded;
+        /// <summary>A floor (build stage) of a building was completed; the number counts from 1.</summary>
+        public event Action<BuildSite, int> FloorBuilt;
+        /// <summary>A building was finished, with the coin bonus it paid.</summary>
+        public event Action<BuildSite, long> BuildingCompleted;
+        /// <summary>The last building of a district was finished (the argument is the district index).</summary>
+        public event Action<int> DistrictCompleted;
+        /// <summary>The hammer was upgraded (with where the player stands, for a little burst).</summary>
+        public event Action<Vector3> HammerUpgraded;
+        /// <summary>Coins arrived from somewhere other than a hammer hit (tourists, a chest): where from, how many.</summary>
+        public event Action<Vector3, long> CoinsGranted;
+        /// <summary>A decoration was finished: the district and which one (0-based).</summary>
+        public event Action<int, int> DecorationBuilt;
+        /// <summary>The last decoration of a district was finished: it earned its golden star.</summary>
+        public event Action<int> GoldStarEarned;
         /// <summary>The last building of the last district was just finished (not raised for a save that was already complete).</summary>
         public event Action CityCompleted;
         /// <summary>Something happened that deserves a sound (played by the audio manager).</summary>
@@ -97,7 +118,13 @@ namespace Game.Core
         /// <summary>A longer story line (text, seconds) for the HUD: the opening and each district's first visit.</summary>
         public event Action<string, float> Story;
 
+        // Hat colours the hired helpers cycle through (the first helper keeps the original yellow).
+        static readonly Func<ToonPalette, Material>[] HelperHats = { p => p.hat, p => p.white, p => p.cone, p => p.green, p => p.hull };
+
         DistrictState[] states;
+        List<DecorationSite>[] decorations;   // per district: the decorations that stand (their models and spots)
+        DecorationSite[] decorationBuilding;  // per district: the one under construction, if any
+        float touristTimer;
         bool[] built;   // districts whose buildings exist (they are made on the first visit, not at startup)
         readonly Economy noEconomy = new Economy();
         readonly Dictionary<BuildSite, (int district, int plot)> siteLookup = new Dictionary<BuildSite, (int, int)>();
@@ -140,6 +167,8 @@ namespace Game.Core
             }
 
             built = new bool[districts.Length];
+            decorations = new List<DecorationSite>[districts.Length];
+            decorationBuilding = new DecorationSite[districts.Length];
             CityComplete = AllDistrictsComplete();
 
             Boost.Changed += OnBuffsChanged;
@@ -174,9 +203,24 @@ namespace Game.Core
             }
 
             if (!InDistrict) return;
+            TickTourists();
             autosave -= Time.deltaTime;
             if (autosave > 0f) return;
             SaveNow();
+        }
+
+        // Every finished decoration brings tourists who tip a little: coins fly from a decoration to the purse every few seconds.
+        void TickTourists()
+        {
+            var state = CurrentState;
+            var count = state.Decorations.Built;
+            if (count <= 0) { touristTimer = 0f; return; }
+            touristTimer += Time.deltaTime;
+            if (touristTimer < Balance.TouristTipSeconds) return;
+            touristTimer = 0f;
+            var tip = (long)System.Math.Round(Balance.TouristIncome(count, Scale) * Balance.TouristTipSeconds);
+            var from = decorations[CurrentIndex][UnityEngine.Random.Range(0, decorations[CurrentIndex].Count)].transform.position + Vector3.up * 2f;
+            GrantCoins(from, tip);
         }
 
         void OnApplicationPause(bool paused)
@@ -237,11 +281,126 @@ namespace Game.Core
                 sites[p].Initialize(states[d].Def.Plans[p], d * sites.Length + p, sites[p].GetComponentInChildren<TMPro.TMP_Text>(true));
                 sites[p].Restore(states[d].PlotWork[p]);
                 sites[p].Completed += OnSiteCompleted;
-                sites[p].FloorBuilt += _ => Sfx?.Invoke(SfxKind.FloorBuilt);
+                sites[p].FloorBuilt += (built, floor) => FloorBuilt?.Invoke(built, floor);
                 siteLookup[sites[p]] = (d, p);
                 if (states[d].IsPlotComplete(p)) SpawnResident(d, p, announce: false);
                 ApplyIssue(d, p);
             }
+            RestoreDecorations(d);
+        }
+
+        // Puts back what the save says: finished decorations stand, an ordered one is under construction where it was left.
+        void RestoreDecorations(int d)
+        {
+            var progress = states[d].Decorations;
+            decorations[d] = new List<DecorationSite>();
+            for (var i = 0; i < progress.Built; i++)
+                decorations[d].Add(DecorationSite.Finished(districts[d].DecorationSlot(i), i, palette));
+            if (progress.Ordered)
+                decorationBuilding[d] = DecorationSite.Begin(districts[d].DecorationSlot(progress.Built), progress.Built, palette, progress.Progress);
+        }
+
+        // ---------- decorations ----------
+
+        /// <summary>Pays for the next decoration of the district being visited; helpers without work come and build it.</summary>
+        public bool OrderDecoration()
+        {
+            if (!InDistrict) return false;
+            var state = CurrentState;
+            if (!state.IsComplete)
+            {
+                ShowHint("Önce mahalledeki bütün binaları bitir");
+                return false;
+            }
+            if (!state.Decorations.TryOrder(true, Economy, Scale)) return false;
+            var d = CurrentIndex;
+            var index = state.Decorations.NextIndex;
+            decorationBuilding[d] = DecorationSite.Begin(CurrentDistrict.DecorationSlot(index), index, palette, 0f);
+            ShowHint($"{StoryBeats.DecorationNames[index]} için işçiler yolda!");
+            Sfx?.Invoke(SfxKind.Buy);
+            StateChanged?.Invoke();
+            SaveNow();
+            return true;
+        }
+
+        /// <summary>The decoration under construction in this district, for a free helper to work on (null when there is none).</summary>
+        public DecorationSite PickDecorationJob() => InDistrict ? decorationBuilding[CurrentIndex] : null;
+
+        /// <summary>A helper hammered at the decoration for <paramref name="seconds"/>.</summary>
+        public void AddDecorationWork(float seconds)
+        {
+            if (!InDistrict) return;
+            var d = CurrentIndex;
+            var site = decorationBuilding[d];
+            if (site == null) return;
+            var progress = states[d].Decorations;
+            var finished = progress.AddWork(seconds);
+            site.SetProgress(finished ? 1f : progress.Progress);
+            if (!finished) return;
+
+            var index = progress.Built - 1;
+            site.Finish();
+            decorations[d].Add(site);
+            decorationBuilding[d] = null;
+            Sfx?.Invoke(SfxKind.BuildingDone);
+            DecorationBuilt?.Invoke(d, index);
+            if (progress.IsComplete) GoldStarEarned?.Invoke(d);
+            StateChanged?.Invoke();
+            SaveNow();
+        }
+
+        /// <summary>A spot next to a finished decoration where a idle helper can stand around (false when there is none yet).</summary>
+        public bool TryPickHangout(out Vector3 point)
+        {
+            point = default;
+            if (!InDistrict) return false;
+            var spots = 0;
+            foreach (var site in decorations[CurrentIndex]) spots += site.Hangouts.Length;
+            if (spots == 0) return false;
+            var pick = UnityEngine.Random.Range(0, spots);
+            foreach (var site in decorations[CurrentIndex])
+            {
+                if (pick < site.Hangouts.Length) { point = site.Hangouts[pick]; return true; }
+                pick -= site.Hangouts.Length;
+            }
+            return false;
+        }
+
+        /// <summary>Coins from somewhere other than a hammer hit (a chest, a happy pet): added to the district's purse, flown in by the HUD.</summary>
+        public void GrantCoins(Vector3 from, long coins)
+        {
+            if (!InDistrict || coins <= 0) return;
+            Economy.Add(coins);
+            CoinsGranted?.Invoke(from, coins);
+        }
+
+        /// <summary>Coins in a treasure chest right now (scales with what the district earns).</summary>
+        public long ChestReward => Balance.ChestReward(Hammer.Level, Workers.Tier, Speed.Level, Scale);
+        public long PetReward => Balance.PetReward(Hammer.Level, Workers.Tier, Speed.Level, Scale);
+        public long BirdTip => Balance.BirdTip(Hammer.Level, Workers.Tier, Speed.Level, Scale);
+
+        /// <summary>True when the player or any helper stands within <paramref name="radius"/> (flat) of the point.</summary>
+        public bool AnyoneNear(Vector3 point, float radius)
+        {
+            if (Vector3.ProjectOnPlane(player.transform.position - point, Vector3.up).magnitude < radius) return true;
+            foreach (var worker in workers)
+                if (worker != null && Vector3.ProjectOnPlane(worker.transform.position - point, Vector3.up).magnitude < radius) return true;
+            return false;
+        }
+
+        /// <summary>Testing hook (see DevCommands -decorate): builds the first <paramref name="count"/> decorations of the current district at once.</summary>
+        public void DevDecorate(int count)
+        {
+            if (!InDistrict) return;
+            var d = CurrentIndex;
+            var progress = states[d].Decorations;
+            while (progress.Built < Mathf.Min(count, Balance.DecorationCount))
+            {
+                var index = progress.Built;
+                progress.Restore(index + 1, false, 0f);
+                decorations[d].Add(DecorationSite.Finished(districts[d].DecorationSlot(index), index, palette));
+            }
+            StateChanged?.Invoke();
         }
 
         void ShowDashboard()
@@ -280,7 +439,7 @@ namespace Game.Core
             player.transform.SetPositionAndRotation(district.PlayerSpawn, Quaternion.Euler(0f, 135f, 0f));
             playerController.SetBounds(district);
             player.gameObject.SetActive(true);
-            for (var n = 0; n < states[index].Workers.Tier; n++) SpawnWorker(district);   // tier 1 = the free first helper
+            for (var n = 0; n < states[index].Workers.Tier; n++) SpawnWorker(district, n);   // tier 1 = the free first helper
             ApplyEffectsTo(player);
             player.Refill();
 
@@ -308,10 +467,12 @@ namespace Game.Core
             ShowDashboard();
         }
 
-        void SpawnWorker(District district)
+        void SpawnWorker(District district, int number)
         {
             var worker = Instantiate(workerPrefab, district.WorkerSpawn, Quaternion.identity);
-            worker.Initialize(this);
+            worker.Initialize(this, number);
+            // Helpers differ from each other: the first keeps the original outfit, the rest cycle through shirt and hat colours.
+            if (number > 0) worker.GetComponent<WorkerVisual>().SetLook(palette.walls[number % palette.walls.Length], HelperHats[number % HelperHats.Length](palette));
             ApplyEffectsTo(worker.GetComponent<Character>());
             workers.Add(worker);
         }
@@ -373,7 +534,7 @@ namespace Game.Core
             var earned = Balance.CoinsFor(applied);
             Economy.Add(earned);
             Sfx?.Invoke(actor.IsPlayer ? SfxKind.HitPlayer : SfxKind.HitWorker);
-            Popup($"+{NumberFormat.Compact(earned)}", point, coinColor, 1f);
+            HitLanded?.Invoke(new HitInfo(point, earned, actor.IsPlayer));   // the coins fly to the purse (Feel/CoinFlight)
             return HitResult.Hit;
         }
 
@@ -412,11 +573,10 @@ namespace Game.Core
 
             var bonus = Balance.CoinsFor(site.Plan.CompletionBonus);
             states[d].Economy.Add(bonus);
-            Popup($"{site.Plan.Name} hazır! +{NumberFormat.Compact(bonus)}",
-                site.transform.position + Vector3.up * 4.5f, bonusColor, 1.7f);
             Sfx?.Invoke(SfxKind.BuildingDone);
             Level.Add(site.Plan.Xp);
-            if (states[d].IsComplete) ShowHint($"{states[d].Def.Name} tamamlandı!");
+            BuildingCompleted?.Invoke(site, bonus);   // the banner shows the name, bonus and XP
+            if (states[d].IsComplete) DistrictCompleted?.Invoke(d);
 
             StateChanged?.Invoke();
             SaveNow();
@@ -441,8 +601,6 @@ namespace Game.Core
         {
             LeveledUp?.Invoke(level);
             Sfx?.Invoke(SfxKind.LevelUp);
-            for (var d = 0; d < states.Length; d++)
-                if (Balance.Districts[d].RequiredLevel == level) ShowHint($"Yeni mahalle açıldı: {Balance.Districts[d].Name}!");
             StateChanged?.Invoke();
         }
 
@@ -457,8 +615,8 @@ namespace Game.Core
             var toCentre = districts[d].Center - site.transform.position;
             toCentre.y = 0f;
             var side = Quaternion.Euler(0f, 40f, 0f) * toCentre.normalized;
-            var home = site.transform.position + side * 3.6f;
-            residents[site] = Resident.Spawn(districts[d].transform, home, palette, d * 3 + p);
+            var home = site.SpotOutside(side, 3.0f);   // outside the walls, however wide the building (a fixed distance put the factory's neighbour inside it)
+            residents[site] = Resident.Spawn(districts[d].transform, home, palette, d * 3 + p, player.transform);
             if (announce) ShowHint(StoryBeats.MovedIn(site.Plan.Name));
         }
 
@@ -504,6 +662,8 @@ namespace Game.Core
         public void BuyHammer()
         {
             if (!InDistrict || !Hammer.TryBuy(Economy)) return;
+            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);   // a bigger hammer for everyone
+            HammerUpgraded?.Invoke(player.transform.position);
             ShowHint($"Çekiç güçlendi! Vuruş: {HammerPower}");
             Sfx?.Invoke(SfxKind.Buy);
             StateChanged?.Invoke();
@@ -512,7 +672,7 @@ namespace Game.Core
         public void BuyWorker()
         {
             if (!InDistrict || !Workers.TryBuy(Economy)) return;
-            SpawnWorker(CurrentDistrict);
+            SpawnWorker(CurrentDistrict, workers.Count);
             ShowHint("Yeni işçi işe başladı!");
             Sfx?.Invoke(SfxKind.Buy);
             StateChanged?.Invoke();
@@ -593,6 +753,7 @@ namespace Game.Core
         void ApplyEffectsTo(Character character)
         {
             character.ApplyStamina(CurrentState != null ? CurrentState.Stamina.Level : 0);
+            character.ApplyHammerTier(CurrentState != null ? CurrentState.Hammer.Tier : 1);
             var pace = CurrentState != null ? Balance.SpeedMultiplier(CurrentState.Speed.Level) : 1f;
             character.SetBuffs(LevelBuff.IsActive, (Boost.IsActive ? Balance.BoostSpeedMultiplier : 1f) * pace);
         }
@@ -606,6 +767,21 @@ namespace Game.Core
         public void ToggleShop() => ShopToggleRequested?.Invoke();
 
         public void ShowHint(string text) => Hint?.Invoke(text);
+
+        /// <summary>Lets the presentation layer ask for a sound (banners, fanfares) without owning an audio source.</summary>
+        public void PlaySfx(SfxKind kind) => Sfx?.Invoke(kind);
+
+        /// <summary>All hired helpers hop for joy (a building or district was finished).</summary>
+        public void CheerWorkers()
+        {
+            foreach (var worker in workers) if (worker != null) worker.Cheer();
+        }
+
+        /// <summary>The villager living in this building celebrates (called when it is finished).</summary>
+        public void CheerResident(BuildSite site)
+        {
+            if (residents.TryGetValue(site, out var resident)) resident.Cheer();
+        }
 
         void Popup(string text, Vector3 position, Color color, float scale)
         {
