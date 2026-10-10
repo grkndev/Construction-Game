@@ -37,6 +37,14 @@ MonoBehaviour:
   door: {fileID: 2100000, guid: 4656dc927c46e4d4bb04e530c91f6799, type: 2}
   scaffold: {fileID: 2100000, guid: 29c767fbd78b3437bb679c5b867b80ed, type: 2}
   flag: {fileID: 2100000, guid: cc09a84f54c084c8ab03517f289e5772, type: 2}
+  brick: {fileID: 2100000, guid: 18767f475449e4951aede1ff97d14a78, type: 2}
+  concrete: {fileID: 2100000, guid: 979dd1917d23f430db4402a6826dc4a4, type: 2}
+  slate: {fileID: 2100000, guid: c8fa6b95e22864a2abcc69c450afb66d, type: 2}
+  hull: {fileID: 2100000, guid: 177d036795d474991a9bc3958a6dc808, type: 2}
+  white: {fileID: 2100000, guid: 013f01c72e43c440ab0c2598e4988d54, type: 2}
+  green: {fileID: 2100000, guid: 1a3dc1972f6a74b75a97734b2dc742c1, type: 2}
+  yellow: {fileID: 2100000, guid: a6697d33fee3a420e901d0ca04f5fdfb, type: 2}
+  sand: {fileID: 2100000, guid: 03aec2b848ff54185b02c33c3c0bc0c6, type: 2}
   skin: {fileID: 2100000, guid: be21a766d085643bd8d0d21d2330b051, type: 2}
   hat: {fileID: 2100000, guid: 96237fecb485f4af79cf225054a2d9b5, type: 2}
   shirt: {fileID: 2100000, guid: 99bce3fc9748b432a8565c792a9cf546, type: 2}

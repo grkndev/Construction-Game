@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using Game.Core;
 
@@ -344,17 +345,33 @@ namespace Game.Tests
         }
 
         [Test]
-        public void EachDistrict_HasThreeGrowingBuildings()
+        public void EachDistrict_HasSixGrowingBuildings()
         {
             foreach (var d in Balance.Districts)
             {
-                Assert.AreEqual(3, d.Plans.Length, d.Name);
+                Assert.AreEqual(6, d.Plans.Length, d.Name);
                 for (var i = 1; i < d.Plans.Length; i++)
                 {
                     Assert.Greater(d.Plans[i].TotalWork, d.Plans[i - 1].TotalWork, d.Name);
-                    Assert.Greater(d.Plans[i].Xp, d.Plans[i - 1].Xp, d.Name);
+                    Assert.GreaterOrEqual(d.Plans[i].Xp, d.Plans[i - 1].Xp, d.Name);
                 }
+                Assert.Greater(d.Plans[d.Plans.Length - 1].Xp, d.Plans[0].Xp, d.Name);
             }
+        }
+
+        [Test]
+        public void EachDistrict_MixesSeveralKindsOfBuilding()
+        {
+            foreach (var d in Balance.Districts)
+                Assert.GreaterOrEqual(d.Plans.Select(p => p.Kind).Distinct().Count(), 4, d.Name);
+        }
+
+        [Test]
+        public void BuildPlan_KeepsItsLook_WhenScaledByTheDistrict()
+        {
+            var plan = Balance.Districts[4].Plans[5];
+            Assert.AreEqual(BuildingKind.Factory, plan.Kind);
+            Assert.Greater(plan.Size, 1f);
         }
 
         [Test]
@@ -388,7 +405,7 @@ namespace Game.Tests
             {
                 var previous = Balance.Districts[i - 1];
                 var current = Balance.Districts[i];
-                Assert.Greater(current.Plans[2].TotalWork / current.Scale, previous.Plans[2].TotalWork / previous.Scale, current.Name);
+                Assert.Greater(current.Plans[^1].TotalWork / current.Scale, previous.Plans[^1].TotalWork / previous.Scale, current.Name);
             }
         }
 

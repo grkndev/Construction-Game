@@ -5,6 +5,8 @@ using UnityEditor.SceneManagement;
 using Game.World;
 using Game.Core;
 using Game.Editor;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace Game.Tests
 {
@@ -59,7 +61,47 @@ namespace Game.Tests
             {
                 var districts = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<District>(true)).ToArray();
                 Assert.AreEqual(Balance.Districts.Length, districts.Length);
-                foreach (var district in districts) Assert.AreEqual(3, district.Sites.Length, district.name);
+                foreach (var district in districts) Assert.AreEqual(Balance.Districts[System.Array.IndexOf(districts, district)].Plans.Length, district.Sites.Length, district.name);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void SettingsWindow_DimLayerIsNotAParentOfThePanel()
+        {
+            // Clicks on a non-interactive child bubble up to the nearest parent handler: if the "tap outside to close" button were
+            // a parent of the panel, every tap inside the panel (or on a slider's track) would close the window.
+            var scene = EditorSceneManager.OpenScene(GameSceneBuilder.ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                var panel = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Game.UI.SettingsPanel>(true)).Single();
+                var dim = panel.GetComponentsInChildren<Button>(true).Single(b => b.name == "Dim");
+                foreach (var graphic in panel.GetComponentsInChildren<Graphic>(true))
+                {
+                    if (graphic.gameObject == dim.gameObject) continue;
+                    Assert.IsFalse(graphic.transform.IsChildOf(dim.transform), $"{graphic.name} sits under the dim layer");
+                }
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void MainScene_HasAScreenFade_ThatNeverBlocksInput()
+        {
+            var scene = EditorSceneManager.OpenScene(GameSceneBuilder.ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                var fade = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Game.UI.ScreenFade>(true)).Single();
+                var image = fade.GetComponent<Image>();
+                Assert.IsFalse(image.raycastTarget, "the fade must not swallow taps");
+                var game = scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<GameController>(true)).Single();
+                Assert.AreSame(fade, new SerializedObject(game).FindProperty("fade").objectReferenceValue);
             }
             finally
             {

@@ -181,6 +181,15 @@ namespace Game.Editor
             palette.scaffold = Mat("Scaffold", "#DDAE6A", thin);
             palette.flag = Mat("Flag", "#FF4D4D", thin);
 
+            palette.brick = Mat("Brick", "#D9694F");
+            palette.concrete = Mat("Concrete", "#A9B0C4");
+            palette.slate = Mat("Slate", "#4E5370");
+            palette.hull = Mat("Hull", "#3D6FC8");
+            palette.white = Mat("White", "#F6F3FB");
+            palette.green = Mat("Green", "#47B873");
+            palette.yellow = Mat("Yellow", "#FFC93A");
+            palette.sand = Mat("Sand", "#EBCB92");
+
             palette.skin = Mat("Skin", "#FFD6AE");
             palette.hat = Mat("Hat", "#FFD62A");
             palette.shirt = Mat("Shirt", "#3F8CFF");

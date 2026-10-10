@@ -11,7 +11,7 @@ namespace Game.UI
     /// </summary>
     public sealed class DashboardHud : MonoBehaviour
     {
-        const float CardHeightAboveGround = 16f;   // cards float above the district so they do not hide its buildings
+        const float CardHeightAboveGround = 4f;    // cards float a little above their province
 
         [SerializeField] GameObject root;
         [SerializeField] DistrictCard[] cards;
@@ -81,7 +81,7 @@ namespace Game.UI
 
             for (var i = 0; i < cards.Length; i++)
             {
-                var world = game.Districts[i].Center + Vector3.up * CardHeightAboveGround;
+                var world = game.Districts[i].MapPoint + Vector3.up * CardHeightAboveGround;
                 cards[i].Rect.position = cam.WorldToScreenPoint(world);
             }
         }

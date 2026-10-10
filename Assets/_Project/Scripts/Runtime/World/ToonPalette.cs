@@ -29,6 +29,16 @@ namespace Game.World
         public Material scaffold;
         public Material flag;
 
+        [Header("Building kits")]
+        public Material brick;
+        public Material concrete;
+        public Material slate;      // dark roofs, chimney tops, tyres
+        public Material hull;       // ship hulls
+        public Material white;
+        public Material green;
+        public Material yellow;
+        public Material sand;
+
         [Header("Worker")]
         public Material skin;
         public Material hat;

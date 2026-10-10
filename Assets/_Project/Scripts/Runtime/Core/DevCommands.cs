@@ -9,7 +9,7 @@ namespace Game.Core
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings (<c>-finishAll</c>: the whole city), <c>-break N</c> gives two of them a problem,
-    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel.
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
@@ -41,7 +41,18 @@ namespace Game.Core
             }
             if (int.TryParse(LaunchArgs.Value("-enter"), out var district)) game.EnterDistrict(district);
             if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);   // goes to the district just entered
+            var at = LaunchArgs.Value("-at")?.Split(',');
+            if (at != null && at.Length == 2 && game.InDistrict
+                && float.TryParse(at[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var atX)
+                && float.TryParse(at[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var atZ))
+            {
+                var controller = player.GetComponent<CharacterController>();
+                controller.enabled = false;
+                player.transform.position = game.CurrentDistrict.Center + new Vector3(atX, 0f, atZ);
+                controller.enabled = true;
+            }
             if (LaunchArgs.Has("-shop")) game.ToggleShop();
+            if (LaunchArgs.Has("-settings")) FindFirstObjectByType<Game.UI.SettingsPanel>()?.Open();
             if (demo) StartCoroutine(Demo());
 
             if (shot == null) yield break;

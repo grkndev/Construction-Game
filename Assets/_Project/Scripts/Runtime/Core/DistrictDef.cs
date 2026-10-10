@@ -21,7 +21,7 @@ namespace Game.Core
             RequiredLevel = requiredLevel;
             Scale = scale;
             Plans = Array.ConvertAll(basePlans, p =>
-                new BuildPlan(p.Name, p.Floors, p.WorkPerFloor * scale, p.CompletionBonus * scale, p.Xp));
+                new BuildPlan(p.Name, p.Floors, p.WorkPerFloor * scale, p.CompletionBonus * scale, p.Xp, p.Kind, p.Size, p.Variant));
         }
     }
 }

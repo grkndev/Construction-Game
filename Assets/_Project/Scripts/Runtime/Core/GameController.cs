@@ -19,17 +19,21 @@ namespace Game.Core
     public sealed class GameController : MonoBehaviour
     {
         const float AutosaveSeconds = 30f;
+        /// <summary>Inside a district the camera sits this much farther out than its base offset (so the bigger buildings fit); the editor sizes the ground from it.</summary>
+        public const float DistrictViewScale = 1.25f;
 
         [SerializeField] District[] districts;
         [SerializeField] AutoWorker workerPrefab;
         [SerializeField] FloatingText floatingTextPrefab;
         [SerializeField] GameHud hud;
         [SerializeField] DashboardHud dashboard;
+        [SerializeField] ScreenFade fade;
         [SerializeField] Character player;
         [SerializeField] IsoCameraFollow cameraRig;
         [SerializeField] Transform overviewTarget;
+        [SerializeField] GameObject mapRoot;            // the picture of the country shown on the dashboard
         [SerializeField] ToonPalette palette;
-        [SerializeField] float overviewScale = 7.2f;
+        [SerializeField] float overviewScale = 5.8f;
         [SerializeField] Color coinColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] Color bonusColor = new Color(0.45f, 1f, 0.55f);
         [SerializeField] Color colaColor = new Color(1f, 0.93f, 0.35f);
@@ -78,6 +82,8 @@ namespace Game.Core
         /// <summary>Raised when something the HUD shows changes outside the economy: cola count, boost, plot finished, upgrades.</summary>
         public event Action StateChanged;
         public event Action ModeChanged;
+        /// <summary>The camera jumped to another place (map or a district): the HUD covers the cut with a fade.</summary>
+        public event Action ViewChanged;
         /// <summary>The coins of the district being visited changed (or the purse in use changed).</summary>
         public event Action CoinsChanged;
         public event Action<string> Hint;
@@ -156,7 +162,8 @@ namespace Game.Core
         {
             hud.Bind(this);
             dashboard.Bind(this);
-            ShowDashboard(snapCamera: true);
+            fade.Bind(this);
+            ShowDashboard();
 
             if (!openingSeen)
             {
@@ -227,14 +234,16 @@ namespace Game.Core
 
         // ---------- dashboard <-> district ----------
 
-        void ShowDashboard(bool snapCamera = false)
+        void ShowDashboard()
         {
             Mode = GameMode.Dashboard;
             CurrentIndex = -1;
             FocusSite = null;
-            foreach (var district in districts) district.SetVisible(true);
+            foreach (var district in districts) district.SetVisible(false);
+            if (mapRoot != null) mapRoot.SetActive(true);
             player.gameObject.SetActive(false);
-            cameraRig.SetView(overviewTarget, overviewScale, snapCamera);
+            cameraRig.SetView(overviewTarget, overviewScale);
+            ViewChanged?.Invoke();
             ModeChanged?.Invoke();
             CoinsChanged?.Invoke();
             StateChanged?.Invoke();
@@ -254,16 +263,18 @@ namespace Game.Core
             Mode = GameMode.InDistrict;
             CurrentIndex = index;
             for (var d = 0; d < districts.Length; d++) districts[d].SetVisible(d == index);
+            if (mapRoot != null) mapRoot.SetActive(false);
 
             var district = districts[index];
             player.transform.SetPositionAndRotation(district.PlayerSpawn, Quaternion.Euler(0f, 135f, 0f));
-            playerController.SetBounds(district.Center, district.WalkRadius);
+            playerController.SetBounds(district);
             player.gameObject.SetActive(true);
             for (var n = 0; n < states[index].Workers.Tier; n++) SpawnWorker(district);   // tier 1 = the free first helper
             ApplyEffectsTo(player);
             player.Refill();
 
-            cameraRig.SetView(player.transform, 1f, snap: true);
+            cameraRig.SetView(player.transform, DistrictViewScale);
+            ViewChanged?.Invoke();
             ModeChanged?.Invoke();
             CoinsChanged?.Invoke();
             StateChanged?.Invoke();

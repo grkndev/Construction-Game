@@ -9,8 +9,7 @@ namespace Game.Player
     {
         [SerializeField] float speed = 5.5f;
         [SerializeField] float turnSpeed = 14f;
-        [SerializeField] float islandRadius = 13f;
-        Vector3 islandCenter;
+        District district;
         [SerializeField] WorkerVisual visual;
 
         CharacterController controller;
@@ -25,12 +24,8 @@ namespace Game.Player
             character = GetComponent<Character>();
         }
 
-        /// <summary>The walkable circle of the district the player is in.</summary>
-        public void SetBounds(Vector3 center, float radius)
-        {
-            islandCenter = new Vector3(center.x, 0f, center.z);
-            islandRadius = radius;
-        }
+        /// <summary>The district the player is in; they are kept inside its walkable region.</summary>
+        public void SetBounds(District current) => district = current;
 
         void Update()
         {
@@ -46,13 +41,15 @@ namespace Game.Player
             // Small constant downward push keeps the controller grounded on the flat island.
             controller.Move((direction * (speed * character.SpeedMultiplier) + Vector3.down * 2f) * Time.deltaTime);
 
-            var flat = new Vector3(transform.position.x, 0f, transform.position.z) - islandCenter;
-            if (flat.magnitude > islandRadius)
+            if (district != null)
             {
-                var clamped = islandCenter + flat.normalized * islandRadius;
-                controller.enabled = false;
-                transform.position = new Vector3(clamped.x, transform.position.y, clamped.z);
-                controller.enabled = true;
+                var clamped = district.Clamp(transform.position);
+                if ((clamped - transform.position).sqrMagnitude > 1e-6f)
+                {
+                    controller.enabled = false;
+                    transform.position = clamped;
+                    controller.enabled = true;
+                }
             }
 
             if (direction.sqrMagnitude > 0.001f)

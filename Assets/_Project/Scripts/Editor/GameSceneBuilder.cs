@@ -22,13 +22,13 @@ namespace Game.Editor
     {
         public const string ScenePath = "Assets/_Project/Scenes/Main.unity";
         const string ParticleMatPath = "Assets/_Project/Art/Materials/Particle.mat";
-        // Layout numbers below were first drawn for a district of radius 14; Grow stretches every distance inside a district so
-        // the player has room to walk between the plots (buildings and props keep their size).
-        const float Grow = 1.6f;
-        const float PlotRing = 6.8f;
-        const float DistrictRadius = 14f * Grow;
-        const float DistrictGap = 1.16f;   // >1 leaves open water between neighbouring districts on the dashboard
-        const float DistrictRing = DistrictRadius / 0.5878f * DistrictGap;   // distance of each district from the island centre (neighbours would touch at gap 1; sin 36 deg)
+        // A district is a square play area of 2 * HalfSize with the ground running on far past it (see BuildDistrict). Plots sit on a 3 x 2
+        // grid. Districts live far apart in the scene (only the one being visited is switched on); the map screen is a separate picture.
+        const float HalfSize = 26f;
+        const float BeachWidth = 3.5f;        // on a coast the ground ends this far past the play area
+        const float DistrictSpacing = 1000f;
+        const float ViewAspect = 2.6f;        // widest screen the ground must cover (20:9 phones are 2.2)
+        static readonly Vector2[] PlotGrid = { new Vector2(-16f, -10f), new Vector2(0f, -10f), new Vector2(-16f, 10f), new Vector2(16f, -10f), new Vector2(0f, 10f), new Vector2(16f, 10f) };
 
         public static void Ensure()
         {
@@ -61,6 +61,10 @@ namespace Game.Editor
             var overview = new GameObject("OverviewTarget").transform;
             overview.position = Vector3.zero;
 
+            // The dashboard shows a picture of the country; each district's card sits on its province.
+            var map = MapBuilder.Build(palette);
+            for (var i = 0; i < districts.Length; i++) EditorWire.Set(districts[i], "mapPoint", map.Anchors[i]);
+
             var gameGo = new GameObject("Game");
             var game = gameGo.AddComponent<GameController>();
             EditorWire.Set(gameGo.AddComponent<DevCommands>(), "game", game);
@@ -75,15 +79,17 @@ namespace Game.Editor
             EditorWire.Set(spawner, "player", player.transform);
             EditorWire.Set(spawner, "palette", palette);
             var audioManager = BuildAudio(game);
-            BuildHud(font, outlineMat, audioManager, out var hud, out var dashboard);
+            BuildHud(font, outlineMat, audioManager, out var hud, out var dashboard, out var fade);
 
             EditorWire.SetArray(game, "districts", districts);
             EditorWire.Set(game, "workerPrefab", autoWorker);
             EditorWire.Set(game, "floatingTextPrefab", floatingText);
             EditorWire.Set(game, "hud", hud);
             EditorWire.Set(game, "dashboard", dashboard);
+            EditorWire.Set(game, "fade", fade);
             EditorWire.Set(game, "cameraRig", cameraRig);
             EditorWire.Set(game, "overviewTarget", overview);
+            EditorWire.Set(game, "mapRoot", map.Root);
             EditorWire.Set(game, "palette", palette);
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException($"Could not save {ScenePath}");
@@ -110,60 +116,119 @@ namespace Game.Editor
             Prim.Cube(sea, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(700f, 0.2f, 700f), p.sea);
         }
 
-        // One neighbourhood: a round island piece of its own tint, three plots, scenery and one landmark. The five
-        // pieces sit on a ring around a small lake so that, seen together, they read as one island.
+        // Sides of the play square: 0 = +x, 1 = -x, 2 = +z, 3 = -z. Sahil is on the sea at +x and Liman at +z (the far edges, so the water
+        // shows at the top of the screen); the other districts are inland and never show an edge.
+        static int CoastSide(int district) => district == 0 ? 0 : district == 2 ? 2 : -1;
+
+        // One neighbourhood: a square play area with six plots on a grid, scenery, one landmark and a fence. The ground extends past the
+        // play area by everything the camera can show from its edge, so there is nothing to see beyond (except the sea on a coast), and
+        // scenery is only placed in what can be seen.
         static District BuildDistrict(int index, ToonPalette p, TMP_FontAsset font, Material outlineMat)
         {
             var def = Balance.Districts[index];
-            var outward = 90f - index * 72f;
             var root = new GameObject($"District {index + 1} - {def.Name}");
-            root.transform.position = PolarPoint(DistrictRing, outward);
+            root.transform.position = new Vector3(0f, 0f, DistrictSpacing * (index + 1));
             var t = root.transform;
+            var coast = CoastSide(index);
 
-            Prim.Cylinder(t, "IslandBase", new Vector3(0f, -1.5f, 0f), new Vector3(26f * Grow, 1f, 26f * Grow), p.dirt);
-            Prim.Cylinder(t, "IslandTop", new Vector3(0f, -0.25f, 0f), new Vector3(28f * Grow, 0.25f, 28f * Grow), p.districtGround[index]);
+            // What the camera can show beyond the play area, per side (relative to the player standing on the edge).
+            var view = ViewFootprint.Extents.Of(new Vector3(-19f, 21f, -19f), GameController.DistrictViewScale, 30f, ViewAspect);
+            float[] reach = { view.MaxX, -view.MinX, view.MaxZ, -view.MinZ };   // by side
+            var limit = new float[4];
+            for (var side = 0; side < 4; side++) limit[side] = HalfSize + (side == coast ? BeachWidth : reach[side] + 6f);
+
+            // Ground: one slab per layer with the real extents (no scaling, so outlines keep their width), dirt below.
+            var top = Rect4(-limit[1], limit[0], -limit[3], limit[2]);
+            var inset = Rect4(-limit[1] + (coast == 1 ? 1.2f : 0f), limit[0] - (coast == 0 ? 1.2f : 0f), -limit[3] + (coast == 3 ? 1.2f : 0f), limit[2] - (coast == 2 ? 1.2f : 0f));
+            MeshPart(t, "IslandBase", IslandMeshBuilder.Prism($"District{index + 1}Base", inset, -2.5f, -0.5f), p.dirt);
+            MeshPart(t, "IslandTop", IslandMeshBuilder.Prism($"District{index + 1}Top", top, -0.5f, 0f), p.districtGround[index]);
+            Prim.Cube(t, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(1600f, 0.2f, 1600f), p.sea);
             var ground = new GameObject("GroundCollider");
             ground.transform.SetParent(t, false);
             ground.transform.localPosition = new Vector3(0f, -0.5f, 0f);
-            ground.AddComponent<BoxCollider>().size = new Vector3(30f * Grow, 1f, 30f * Grow);
+            ground.AddComponent<BoxCollider>().size = new Vector3(HalfSize * 2f + 8f, 1f, HalfSize * 2f + 8f);
 
-            // Scenery on the rim, away from the plots and the centre; rotated per district so no two look alike.
-            var turn = index * 37f;
-            var treeAngles = new[] { 10f, 28f, 38f, 62f, 100f, 128f, 150f, 165f, 190f, 205f, 232f, 255f, 280f, 300f, 318f, 335f, 352f };
-            for (var i = 0; i < treeAngles.Length; i++)
-                BuildTree(t, Local(11.2f + (i % 3) * 0.9f, treeAngles[i] + turn), 0.9f + (i % 3) * 0.15f, p);
-
-            // A few trees and rocks out in the open between the plots so the middle of the district is not bare.
-            for (var i = 0; i < 6; i++)
+            // Where things stand: plots first, then the landmark; everything else keeps clear of both.
+            var plans = def.Plans;
+            var plotSpots = new Vector3[plans.Length];
+            var yardRadius = new float[plans.Length];
+            for (var n = 0; n < plans.Length; n++)
             {
-                var angle = 30f + i * 60f + turn;   // plots sit at 90/210/330, so 30/150/270 are the gaps
-                var spot = Local(i % 2 == 0 ? 8.6f : 6.4f, angle + (i % 2 == 0 ? 0f : 17f));
-                if (i % 2 == 0) BuildTree(t, spot, 0.8f, p);
-                else Prim.Sphere(t, "Rock", spot + Vector3.up * 0.15f, new Vector3(1.0f, 0.6f, 0.8f), p.stone).transform.Rotate(0f, angle, 0f);
+                plotSpots[n] = new Vector3(PlotGrid[n].x, 0f, PlotGrid[n].y);
+                var yard = YardSize(plans[n]);
+                yardRadius[n] = Mathf.Max(yard.x, yard.y) * 0.5f;
+            }
+            // On a coast the landmark stands on the beach just past the play area, its boat or pier reaching out over the water;
+            // inland it stands at the left edge, where nothing else is.
+            var outwardDeg = coast == 0 ? 0f : coast == 2 ? 90f : 180f;
+            var landmarkSpot = coast == 0 ? new Vector3(HalfSize + 1f, 0f, -4f) : coast == 2 ? new Vector3(-4f, 0f, HalfSize + 1f) : new Vector3(-HalfSize + 4f, 0f, 0f);
+            BuildLandmark(t, p, index, landmarkSpot, outwardDeg, 1f, onLand: coast < 0);
+
+            bool Free(Vector3 spot, float margin)
+            {
+                if (Mathf.Abs(spot.x) > HalfSize - 1.5f || Mathf.Abs(spot.z) > HalfSize - 1.5f) return false;
+                if (Vector3.Distance(spot, landmarkSpot) < 5.5f) return false;
+                for (var n = 0; n < plotSpots.Length; n++)
+                    if (Vector3.Distance(spot, plotSpots[n]) < yardRadius[n] + margin) return false;
+                return true;
             }
 
-            foreach (var spot in new[] { Local(10.2f, 62f + turn), Local(9.8f, 228f + turn) })
+            // Inside the fence: a few trees, rocks, cones and crates between the plots.
+            var random = new System.Random(index * 31 + 7);
+            float Rand(float lo, float hi) => lo + (float)random.NextDouble() * (hi - lo);
+            var scenery = 0;
+            for (var attempt = 0; attempt < 400 && scenery < 26; attempt++)
             {
-                Prim.Cube(t, "Crate", spot + Vector3.up * 0.45f, Vector3.one * 0.9f, p.crate, true);
-                Prim.Cube(t, "Crate", spot + new Vector3(0.9f, 0.45f, 0.3f), Vector3.one * 0.9f, p.crate, true).transform.Rotate(0f, 20f, 0f);
-                Prim.Cube(t, "Crate", spot + new Vector3(0.3f, 1.35f, 0.1f), Vector3.one * 0.9f, p.crate).transform.Rotate(0f, 10f, 0f);
+                var spot = new Vector3(Rand(-HalfSize, HalfSize), 0f, Rand(-HalfSize, HalfSize));
+                if (!Free(spot, 1.2f)) continue;
+                switch (scenery % 6)
+                {
+                    case 0: case 3: BuildTree(t, spot, Rand(0.85f, 1.1f), p); break;
+                    case 1: Prim.Sphere(t, "Rock", spot + Vector3.up * 0.15f, new Vector3(1.1f, 0.65f, 0.9f), p.stone).transform.Rotate(0f, Rand(0f, 180f), 0f); break;
+                    case 2:
+                        Prim.Cube(t, "Crate", spot + Vector3.up * 0.45f, Vector3.one * 0.9f, p.crate, true);
+                        Prim.Cube(t, "Crate", spot + new Vector3(0.9f, 0.45f, 0.3f), Vector3.one * 0.9f, p.crate, true).transform.Rotate(0f, 20f, 0f);
+                        Prim.Cube(t, "Crate", spot + new Vector3(0.3f, 1.35f, 0.1f), Vector3.one * 0.9f, p.crate).transform.Rotate(0f, 10f, 0f);
+                        break;
+                    default:
+                        Prim.Cylinder(t, "ConeBase", spot + Vector3.up * 0.04f, new Vector3(0.55f, 0.04f, 0.55f), p.cone);
+                        Prim.Cylinder(t, "ConeBody", spot + Vector3.up * 0.35f, new Vector3(0.3f, 0.3f, 0.3f), p.cone, true);
+                        Prim.Cylinder(t, "ConeTip", spot + Vector3.up * 0.7f, new Vector3(0.18f, 0.08f, 0.18f), p.cone);
+                        break;
+                }
+                scenery++;
             }
 
-            foreach (var spot in new[] { Local(4.2f, 0f + turn), Local(4.4f, 140f + turn), Local(3.9f, 320f + turn), Local(5.5f, 80f + turn), Local(5.2f, 250f + turn) })
+            // Outside the fence: a forest across everything the camera can show (dense near the fence, thin further out), no coast side.
+            // (x, z) of every candidate comes from a jittered grid so rows do not look ruled.
+            const float step = 4.6f;
+            var forest = 0;
+            for (var gx = -limit[1] + 2f; gx <= limit[0] - 2f; gx += step)
+            for (var gz = -limit[3] + 2f; gz <= limit[2] - 2f; gz += step)
             {
-                Prim.Cylinder(t, "ConeBase", spot + Vector3.up * 0.04f, new Vector3(0.55f, 0.04f, 0.55f), p.cone);
-                Prim.Cylinder(t, "ConeBody", spot + Vector3.up * 0.35f, new Vector3(0.3f, 0.3f, 0.3f), p.cone, true);
-                Prim.Cylinder(t, "ConeTip", spot + Vector3.up * 0.7f, new Vector3(0.18f, 0.08f, 0.18f), p.cone);
+                var spot = new Vector3(gx + Rand(-1.4f, 1.4f), 0f, gz + Rand(-1.4f, 1.4f));
+                var beyond = Mathf.Max(Mathf.Abs(spot.x), Mathf.Abs(spot.z)) - HalfSize;   // distance past the play area (Chebyshev)
+                if (beyond < 1.6f) continue;
+                if (coast == 0 && spot.x > HalfSize - 1f || coast == 2 && spot.z > HalfSize - 1f) continue;   // the beach and the sea
+                if (spot.x > limit[0] - 1f || spot.x < -limit[1] + 1f || spot.z > limit[2] - 1f || spot.z < -limit[3] + 1f) continue;
+                if (Vector3.Distance(spot, landmarkSpot) < 6f) continue;
+                if (beyond > 13f && Rand(0f, 1f) > 0.3f) continue;   // thinner away from the fence
+                BuildTree(t, spot, Rand(0.9f, 1.25f), p, collider: false);
+                forest++;
             }
+            Debug.Log($"[Scene] {def.Name}: {forest} forest trees, ground x {-limit[1]:0}..{limit[0]:0}, z {-limit[3]:0}..{limit[2]:0}");
 
-            foreach (var angle in new[] { 80f, 190f, 310f })
-                Prim.Sphere(t, "Rock", Local(12.3f, angle + turn) + Vector3.up * 0.15f, new Vector3(1.2f, 0.7f, 0.9f), p.stone).transform.Rotate(0f, angle, 0f);
+            var barriers = new GameObject("Barriers").transform;
+            barriers.SetParent(t, false);
+            var edge = HalfSize + 0.2f;
+            if (coast != 0) BuildFence(barriers, new Vector2(edge, -edge), new Vector2(edge, edge), p);
+            if (coast != 1) BuildFence(barriers, new Vector2(-edge, -edge), new Vector2(-edge, edge), p);
+            if (coast != 2) BuildFence(barriers, new Vector2(-edge, edge), new Vector2(edge, edge), p);
+            if (coast != 3) BuildFence(barriers, new Vector2(-edge, -edge), new Vector2(edge, -edge), p);
 
-            BuildLandmark(index, t, p);
-
-            var sites = new BuildSite[def.Plans.Length];
+            var sites = new BuildSite[plans.Length];
             for (var n = 0; n < sites.Length; n++)
-                sites[n] = BuildPlot(t, n, def.Plans[n], Local(PlotRing, 90f + n * 120f), p, font, outlineMat);
+                sites[n] = BuildPlot(t, n, plans[n], plotSpots[n], p, font, outlineMat);
 
             var playerSpawn = new GameObject("PlayerSpawn").transform;
             playerSpawn.SetParent(t, false);
@@ -175,24 +240,55 @@ namespace Game.Editor
             EditorWire.SetArray(district, "sites", sites);
             EditorWire.Set(district, "playerSpawn", playerSpawn);
             EditorWire.Set(district, "workerSpawn", workerSpawn);
-            EditorWire.SetFloat(district, "walkRadius", DistrictRadius - 1f);
+            EditorWire.SetFloat(district, "halfSize", HalfSize);
             return district;
         }
 
-        // One recognisable thing per district, on the sea side of the island (away from the lake) so it frames the overview.
-        static void BuildLandmark(int index, Transform t, ToonPalette p)
+        static Vector2[] Rect4(float minX, float maxX, float minZ, float maxZ) =>
+            new[] { new Vector2(minX, minZ), new Vector2(maxX, minZ), new Vector2(maxX, maxZ), new Vector2(minX, maxZ) };   // counter-clockwise
+
+        static GameObject MeshPart(Transform parent, string name, Mesh mesh, Material material)
         {
-            var outward = 90f - index * 72f;
+            var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            go.GetComponent<MeshRenderer>().sharedMaterial = material;
+            return go;
+        }
+
+        // A wooden fence from a to b (x/z): a post every ~2.2 units and two rails.
+        static void BuildFence(Transform root, Vector2 a, Vector2 b, ToonPalette p)
+        {
+            var length = Vector2.Distance(a, b);
+            var dir = (b - a) / length;
+            var rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.y));
+            var posts = Mathf.CeilToInt(length / 2.2f);
+            for (var k = 0; k <= posts; k++)
+            {
+                var at = Vector2.Lerp(a, b, k / (float)posts);
+                Prim.Cube(root, "Post", new Vector3(at.x, 0.55f, at.y), new Vector3(0.26f, 1.1f, 0.26f), p.trunk);
+            }
+            var mid = (a + b) * 0.5f;
+            foreach (var height in new[] { 0.42f, 0.85f })
+                Prim.Cube(root, "Rail", new Vector3(mid.x, height, mid.y), new Vector3(0.12f, 0.14f, length), p.crate).transform.localRotation = rotation;
+        }
+
+        // One recognisable thing per district. Local +x points towards the sea / away from the centre. On a coast it carries the water
+        // parts (boat, pier); on the map (onLand) those are left out.
+        internal static void BuildLandmark(Transform parent, ToonPalette p, int index, Vector3 localPosition, float outwardDegrees, float scale, bool onLand)
+        {
             var world = new GameObject("Landmark").transform;
-            world.SetParent(t, false);
-            world.localPosition = Local(11.5f, outward);
-            world.localRotation = Quaternion.Euler(0f, -outward, 0f);   // local +x points away from the island centre
+            world.SetParent(parent, false);
+            world.localPosition = localPosition;
+            world.localRotation = Quaternion.Euler(0f, -outwardDegrees, 0f);
+            world.localScale = Vector3.one * scale;
 
             switch (index)
             {
                 case 0:   // Sahil: beach umbrella and a rowing boat on the water
                     Prim.Cylinder(world, "Pole", new Vector3(0f, 1.1f, 0f), new Vector3(0.08f, 1.1f, 0.08f), p.scaffold);
                     Prim.Sphere(world, "Canopy", new Vector3(0f, 2.2f, 0f), new Vector3(2.4f, 0.7f, 2.4f), p.roof);
+                    if (onLand) break;
                     Prim.Cube(world, "Hull", new Vector3(3.6f, -1.75f, 0f), new Vector3(2.8f, 0.5f, 1.2f), p.crate);
                     Prim.Cylinder(world, "Mast", new Vector3(3.6f, -0.9f, 0f), new Vector3(0.06f, 0.9f, 0.06f), p.scaffold);
                     Prim.Cube(world, "Sail", new Vector3(3.6f, -0.7f, 0f), new Vector3(0.05f, 1.0f, 0.9f), p.flag);
@@ -204,9 +300,12 @@ namespace Game.Editor
                     Prim.Sphere(world, "Drop", new Vector3(0f, 2.2f, 0f), Vector3.one * 0.7f, p.window);
                     break;
                 case 2:   // Liman: pier with a crane
-                    Prim.Cube(world, "Pier", new Vector3(3f, 0.1f, 0f), new Vector3(7f, 0.3f, 2.2f), p.crate);
-                    Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, 0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
-                    Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, -0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
+                    if (!onLand)
+                    {
+                        Prim.Cube(world, "Pier", new Vector3(3f, 0.1f, 0f), new Vector3(7f, 0.3f, 2.2f), p.crate);
+                        Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, 0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
+                        Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, -0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
+                    }
                     Prim.Cylinder(world, "CraneMast", new Vector3(0f, 2.2f, 1.8f), new Vector3(0.3f, 2.2f, 0.3f), p.cone);
                     Prim.Cube(world, "CraneArm", new Vector3(1.4f, 4.3f, 1.8f), new Vector3(3.6f, 0.3f, 0.3f), p.cone);
                     Prim.Cube(world, "Hook", new Vector3(2.8f, 3.5f, 1.8f), new Vector3(0.1f, 1.4f, 0.1f), p.scaffold);
@@ -230,25 +329,19 @@ namespace Game.Editor
             }
         }
 
-        static void BuildTree(Transform parent, Vector3 pos, float scale, ToonPalette p)
+        internal static void BuildTree(Transform parent, Vector3 pos, float scale, ToonPalette p, bool collider = true)
         {
             var tree = new GameObject("Tree").transform;
             tree.SetParent(parent, false);
             tree.localPosition = pos;
             tree.localScale = Vector3.one * scale;
-            Prim.Cylinder(tree, "Trunk", new Vector3(0f, 0.7f, 0f), new Vector3(0.4f, 0.7f, 0.4f), p.trunk, true);
+            Prim.Cylinder(tree, "Trunk", new Vector3(0f, 0.7f, 0f), new Vector3(0.4f, 0.7f, 0.4f), p.trunk, collider);
             Prim.Sphere(tree, "LeavesLow", new Vector3(0f, 1.9f, 0f), Vector3.one * 2.3f, p.leaves);
             Prim.Sphere(tree, "LeavesHigh", new Vector3(0.1f, 2.9f, 0.05f), Vector3.one * 1.6f, p.leaves);
         }
 
-        // A point inside a district, in first-draft units (see Grow).
-        static Vector3 Local(float radius, float degrees) => PolarPoint(radius * Grow, degrees);
-
-        static Vector3 PolarPoint(float radius, float degrees)
-        {
-            var a = degrees * Mathf.Deg2Rad;
-            return new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
-        }
+        // The bare-earth oval around a building: its footprint plus room to walk and for helpers to stand.
+        static Vector2 YardSize(BuildPlan plan) => BuildingKits.Footprint(plan) + new Vector2(4.2f, 4.2f);
 
         static BuildSite BuildPlot(Transform parent, int index, BuildPlan plan, Vector3 localPosition, ToonPalette palette, TMP_FontAsset font, Material outlineMat)
         {
@@ -256,7 +349,8 @@ namespace Game.Editor
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPosition;
 
-            var dirt = Prim.Cylinder(go.transform, "Ground", new Vector3(0f, 0.015f, 0f), new Vector3(7.8f, 0.015f, 7.8f), palette.dirt);
+            var yard = YardSize(plan);
+            var dirt = Prim.Cylinder(go.transform, "Ground", new Vector3(0f, 0.015f, 0f), new Vector3(yard.x, 0.015f, yard.y), palette.dirt);
             dirt.transform.SetParent(go.transform, false);
 
             var site = go.AddComponent<BuildSite>();
@@ -415,7 +509,7 @@ namespace Game.Editor
         static readonly Color PanelColor = new Color(0.43f, 0.35f, 0.74f);   // tints the white kit panel
         static readonly Color InkColor = new Color(0.17f, 0.13f, 0.2f);
 
-        static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard)
+        static void BuildHud(TMP_FontAsset font, Material outlineMat, AudioManager audioManager, out GameHud hud, out DashboardHud dashboard, out ScreenFade fade)
         {
             var es = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(InputSystemUIInputModule));
             es.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
@@ -480,18 +574,15 @@ namespace Game.Editor
             var shop = BuildShop(group, kit, buttonSprite, font);
             BuildTouchControls(group, knob);
 
-            // Music and effects switches, top-right on every screen (GameHud shifts them left of the map button inside a district).
+            // Settings gear, top-right on every screen (GameHud shifts it left of the map button inside a district). It opens the
+            // settings window, which is built last so it covers everything.
             var audioGroup = Rect(root, "AudioGroup", new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            var musicButton = TintedButton(audioGroup, "MusicButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-205f, -40f), new Vector2(150f, 90f),
-                new Color(0.85f, 0.8f, 1f), 28, out var musicLabel);
-            var sfxButton = TintedButton(audioGroup, "SfxButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(150f, 90f),
-                new Color(0.85f, 0.8f, 1f), 28, out var sfxLabel);
-            var audioSettings = audioGroup.gameObject.AddComponent<AudioSettingsButtons>();
-            EditorWire.Set(audioSettings, "audioManager", audioManager);
-            EditorWire.Set(audioSettings, "musicButton", musicButton);
-            EditorWire.Set(audioSettings, "musicLabel", musicLabel);
-            EditorWire.Set(audioSettings, "sfxButton", sfxButton);
-            EditorWire.Set(audioSettings, "sfxLabel", sfxLabel);
+            var settingsButton = TintedButton(audioGroup, "SettingsButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(90f, 90f),
+                new Color(0.85f, 0.8f, 1f), 28, out var settingsLabel);
+            settingsLabel.text = "";
+            var gear = MakeImage(settingsButton.transform, "Gear", UiKitBuilder.Gear, Color.white, new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(62f, 62f));
+            gear.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var settings = BuildSettings(root, kit, buttonSprite, font, audioManager, settingsButton);
 
             hud = canvasGo.AddComponent<GameHud>();
             EditorWire.Set(hud, "audioGroup", audioGroup);
@@ -517,6 +608,15 @@ namespace Game.Editor
             EditorWire.Set(hud, "playerEnergyFill", playerFill);
             EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
 
+            // Covers every view change (map <-> district); last in the canvas so it is above everything, never blocks taps.
+            var fadeRt = Rect(root, "Fade", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            Stretch(fadeRt, 0f, 0f);
+            var fadeImage = fadeRt.gameObject.AddComponent<Image>();
+            fadeImage.color = new Color(0.12f, 0.09f, 0.22f, 1f);
+            fadeImage.raycastTarget = false;
+            fade = fadeRt.gameObject.AddComponent<ScreenFade>();
+            EditorWire.Set(fade, "cover", fadeImage);
+
             // A tick for every plain button; purchases and the cola button have sounds of their own.
             var silent = new System.Collections.Generic.HashSet<string> { "HammerButton", "WorkerButton", "StaminaButton", "SpeedButton", "ColaBuyButton", "ColaUseButton" };
             var ticking = new System.Collections.Generic.List<Object>();
@@ -525,6 +625,119 @@ namespace Game.Editor
             var clicks = canvasGo.AddComponent<UiClickSounds>();
             EditorWire.Set(clicks, "audioManager", audioManager);
             EditorWire.SetArray(clicks, "buttons", ticking.ToArray());
+        }
+
+        // Centred window with a slider for the music level and one for the effects level, over a dimmed screen.
+        static SettingsPanel BuildSettings(Transform root, Sprite kit, Sprite buttonSprite, TMP_FontAsset font, AudioManager audioManager, Button openButton)
+        {
+            var host = Rect(root, "Settings", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            host.anchorMin = Vector2.zero;
+            host.anchorMax = Vector2.one;
+            host.offsetMin = host.offsetMax = Vector2.zero;
+
+            var window = Rect(host, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            window.anchorMin = Vector2.zero;
+            window.anchorMax = Vector2.one;
+            window.offsetMin = window.offsetMax = Vector2.zero;
+            // The dim layer is a sibling of the panel, not its parent: a click on a non-interactive child bubbles up to the nearest
+            // parent handler, which would make every tap inside the panel hit this button and close the window.
+            var dimRt = Rect(window, "Dim", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            Stretch(dimRt, 0f, 0f);
+            var dim = dimRt.gameObject.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0.05f, 0.55f);
+            var overlayButton = dimRt.gameObject.AddComponent<Button>();
+            overlayButton.targetGraphic = dim;
+            overlayButton.transition = Selectable.Transition.None;
+
+            var panel = Rect(window, "Panel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 470f));
+            panel.pivot = new Vector2(0.5f, 0.5f);
+            var back = panel.gameObject.AddComponent<Image>();
+            back.sprite = kit;
+            back.type = Image.Type.Sliced;
+            back.color = PanelColor;   // a raycast target, so taps on the panel never reach the dim layer behind it
+
+            var title = Label(panel, "Title", font, null, 52, Color.white, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(500f, 70f));
+            title.rectTransform.pivot = new Vector2(0.5f, 1f);
+            title.text = "AYARLAR";
+            var close = TintedButton(panel, "CloseButton", buttonSprite, font, new Vector2(1f, 1f), new Vector2(-18f, -18f), new Vector2(72f, 72f),
+                new Color(1f, 0.45f, 0.4f), 38, out var closeLabel);
+            closeLabel.text = "X";
+
+            SettingsRow(panel, kit, font, "MÜZİK", -150f, out var musicSlider, out var musicValue);
+            SettingsRow(panel, kit, font, "SES", -290f, out var sfxSlider, out var sfxValue);
+
+            var tip = Label(panel, "Tip", font, null, 26, new Color(1f, 1f, 1f, 0.75f), TextAlignmentOptions.Center, new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(660f, 40f));
+            tip.rectTransform.pivot = new Vector2(0.5f, 0f);
+            tip.text = "Esc ile de açılır ve kapanır";
+
+            var settings = host.gameObject.AddComponent<SettingsPanel>();
+            EditorWire.Set(settings, "audioManager", audioManager);
+            EditorWire.Set(settings, "window", window.gameObject);
+            EditorWire.Set(settings, "openButton", openButton);
+            EditorWire.Set(settings, "closeButton", close);
+            EditorWire.Set(settings, "overlayButton", overlayButton);
+            EditorWire.Set(settings, "musicSlider", musicSlider);
+            EditorWire.Set(settings, "musicValue", musicValue);
+            EditorWire.Set(settings, "sfxSlider", sfxSlider);
+            EditorWire.Set(settings, "sfxValue", sfxValue);
+            window.gameObject.SetActive(false);
+            return settings;
+        }
+
+        static void SettingsRow(Transform panel, Sprite kit, TMP_FontAsset font, string title, float y, out Slider slider, out TMP_Text value)
+        {
+            var label = Label(panel, title + "Label", font, null, 36, Color.white, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 1f), new Vector2(44f, y), new Vector2(190f, 56f));
+            label.text = title;
+
+            var root = Rect(panel, title + "Slider", new Vector2(0f, 1f), new Vector2(240f, y - 8f), new Vector2(380f, 44f));
+            var bg = Rect(root, "Background", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            Stretch(bg, 0f, 0f);
+            var bgImg = bg.gameObject.AddComponent<Image>();
+            bgImg.sprite = UiKitBuilder.BarBack;
+            bgImg.type = Image.Type.Sliced;
+            bgImg.color = new Color(0.3f, 0.24f, 0.5f);
+
+            var fillArea = Rect(root, "Fill Area", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            Stretch(fillArea, 6f, 8f);
+            var fill = Rect(fillArea, "Fill", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = new Vector2(0.5f, 1f);
+            fill.offsetMin = fill.offsetMax = Vector2.zero;
+            var fillImg = fill.gameObject.AddComponent<Image>();
+            fillImg.sprite = UiKitBuilder.BarFill;
+            fillImg.type = Image.Type.Sliced;
+            fillImg.color = new Color(0.45f, 0.82f, 1f);
+
+            var slideArea = Rect(root, "Handle Slide Area", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            Stretch(slideArea, 22f, -4f);   // 52 px tall (the bar is 44): a Slider stretches its handle over the whole slide area vertically
+            var handle = Rect(slideArea, "Handle", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
+            handle.pivot = new Vector2(0.5f, 0.5f);
+            handle.sizeDelta = new Vector2(52f, 0f);
+            var handleImg = handle.gameObject.AddComponent<Image>();
+            handleImg.sprite = UiKitBuilder.Knob;
+
+            slider = root.gameObject.AddComponent<Slider>();
+            slider.fillRect = fill;
+            slider.handleRect = handle;
+            slider.targetGraphic = handleImg;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 1f;
+            slider.transition = Selectable.Transition.None;
+
+            value = Label(panel, title + "Value", font, null, 34, Color.white, TextAlignmentOptions.MidlineRight, new Vector2(1f, 1f), new Vector2(-34f, y), new Vector2(120f, 56f));
+            value.rectTransform.pivot = new Vector2(1f, 1f);
+        }
+
+        // Fills the parent with the given horizontal and vertical margins.
+        static void Stretch(RectTransform rt, float horizontal, float vertical)
+        {
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = new Vector2(horizontal, vertical);
+            rt.offsetMax = new Vector2(-horizontal, -vertical);
         }
 
         // One object that plays all music and effects; the clips are the synthesised WAVs from AudioBuilder.

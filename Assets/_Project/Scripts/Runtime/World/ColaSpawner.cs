@@ -65,9 +65,9 @@ namespace Game.World
         {
             for (var attempt = 0; attempt < 30; attempt++)
             {
-                var angle = Random.value * Mathf.PI * 2f;
-                var radius = Mathf.Sqrt(Random.Range(0.1f, 1f)) * game.CurrentDistrict.WalkRadius * 0.9f;
-                var point = game.CurrentDistrict.Center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                var district = game.CurrentDistrict;
+                var reach = district.HalfSize * 0.85f;
+                var point = district.Clamp(district.Center + new Vector3(Random.Range(-reach, reach), 0f, Random.Range(-reach, reach)));
                 if (!IsFree(point)) continue;
 
                 var pickup = ColaPickup.Spawn(point, palette);

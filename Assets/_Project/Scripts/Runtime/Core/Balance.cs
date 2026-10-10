@@ -14,7 +14,7 @@ namespace Game.Core
         public const int MaxWorkers = 8;
         public const int MaxHammerLevel = 25;
 
-        // ---- Districts: five areas of three buildings. Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
+        // ---- Districts: five areas of six buildings (BuildPlan.Kind picks the model: hut, shop, school, factory, ship...). Each one plays like the first at a bigger scale (DistrictDef.Scale: x4 per
         // district for prices, hit power, work and rewards) with its own upgrades, and later districts also have bigger buildings
         // (the numbers below are first-district shapes times a per-district size: x0.85, 2, 4, 7, 10), so they take longer.
         // Tuned with tools/balance_sim.py (attentive player, all upgrades, own coins in every district, one free helper to start,
@@ -23,29 +23,44 @@ namespace Game.Core
         public static readonly DistrictDef[] Districts =
         {
             new DistrictDef("Sahil",  requiredLevel: 1, scale: 1,
-                new BuildPlan("Kulübe",         3, 76,   102,   xp: 1),
-                new BuildPlan("Balıkçı Evi",    4, 255,  357,   xp: 2),
-                new BuildPlan("Pansiyon",       6, 680,  1105,  xp: 3)),
+                new BuildPlan("Kulübe",         2, 145, 130, xp: 1, kind: BuildingKind.Hut),
+                new BuildPlan("Dondurmacı",     2, 232, 195, xp: 1, kind: BuildingKind.Shop, variant: 1),
+                new BuildPlan("Balıkçı Teknesi",3, 232, 264, xp: 2, kind: BuildingKind.Ship, size: 0.8f, variant: 2),
+                new BuildPlan("Balıkçı Evi",    3, 348, 355, xp: 2, kind: BuildingKind.House),
+                new BuildPlan("Pansiyon",       4, 377, 452, xp: 3, kind: BuildingKind.Apartment),
+                new BuildPlan("Fener",          5, 464, 626, xp: 3, kind: BuildingKind.Lighthouse)),
             new DistrictDef("Merkez", requiredLevel: 3, scale: 4,
-                new BuildPlan("Dükkan",         3, 180,  240,   xp: 2),
-                new BuildPlan("Kafe",           4, 600,  840,   xp: 3),
-                new BuildPlan("Belediye",       6, 1600, 2600,  xp: 4)),
+                new BuildPlan("Dükkan",         2, 341, 307, xp: 2, kind: BuildingKind.Shop),
+                new BuildPlan("Kafe",           3, 364, 458, xp: 2, kind: BuildingKind.Shop, variant: 1),
+                new BuildPlan("Postane",        3, 546, 622, xp: 3, kind: BuildingKind.House, variant: 1),
+                new BuildPlan("Okul",           3, 818, 835, xp: 3, kind: BuildingKind.School),
+                new BuildPlan("Apartman",       5, 709, 1064, xp: 4, kind: BuildingKind.Apartment, variant: 1),
+                new BuildPlan("Belediye",       5, 1091, 1473, xp: 4, kind: BuildingKind.TownHall)),
             new DistrictDef("Liman",  requiredLevel: 5, scale: 16,
-                new BuildPlan("Depo",           3, 360,  480,   xp: 3),
-                new BuildPlan("Lokanta",        4, 1200, 1680,  xp: 4),
-                new BuildPlan("Gümrük",         6, 3200, 5200,  xp: 6)),
+                new BuildPlan("Depo",           2, 682, 614, xp: 3, kind: BuildingKind.Warehouse),
+                new BuildPlan("Lokanta",        3, 727, 917, xp: 4, kind: BuildingKind.Shop, variant: 2),
+                new BuildPlan("Römorkör",       3, 1091, 1244, xp: 4, kind: BuildingKind.Ship, size: 0.8f, variant: 2),
+                new BuildPlan("Gümrük",         4, 1228, 1670, xp: 5, kind: BuildingKind.School, variant: 1),
+                new BuildPlan("Yolcu Gemisi",   5, 1419, 2128, xp: 5, kind: BuildingKind.Ship, variant: 1),
+                new BuildPlan("Kargo Gemisi",   6, 1819, 2946, xp: 5, kind: BuildingKind.Ship, size: 1.2f)),
             new DistrictDef("Tepe",   requiredLevel: 7, scale: 64,
-                new BuildPlan("Değirmen",       3, 630,  840,   xp: 4),
-                new BuildPlan("Çiftlik Evi",    4, 2100, 2940,  xp: 5),
-                new BuildPlan("Fener",          6, 5600, 9100,  xp: 7)),
+                new BuildPlan("Ahır",           2, 1194, 1074, xp: 4, kind: BuildingKind.Warehouse, variant: 1),
+                new BuildPlan("Çiftlik Evi",    3, 1273, 1604, xp: 5, kind: BuildingKind.House),
+                new BuildPlan("Konak",          4, 1432, 2177, xp: 5, kind: BuildingKind.Apartment, variant: 2),
+                new BuildPlan("Değirmen",       4, 2148, 2922, xp: 6, kind: BuildingKind.Windmill),
+                new BuildPlan("Su Kulesi",      5, 2482, 3724, xp: 6, kind: BuildingKind.Silo, variant: 1),
+                new BuildPlan("Büyük Değirmen", 6, 3183, 5156, xp: 6, kind: BuildingKind.Windmill, size: 1.25f)),
             new DistrictDef("Sanayi", requiredLevel: 9, scale: 256,
-                new BuildPlan("Atölye",         3, 900,  1200,  xp: 5),
-                new BuildPlan("Fabrika",        4, 3000, 4200,  xp: 6),
-                new BuildPlan("Baca Kulesi",    6, 8000, 13000, xp: 8)),
+                new BuildPlan("Atölye",         2, 1705, 1534, xp: 5, kind: BuildingKind.Warehouse, variant: 2),
+                new BuildPlan("İşçi Evleri",    3, 1819, 2292, xp: 5, kind: BuildingKind.Apartment, variant: 2),
+                new BuildPlan("Silo",           4, 2046, 3110, xp: 6, kind: BuildingKind.Silo),
+                new BuildPlan("Küçük Fabrika",  3, 4092, 4174, xp: 6, kind: BuildingKind.Factory, size: 0.85f),
+                new BuildPlan("Baca Kulesi",    6, 2955, 5320, xp: 8, kind: BuildingKind.Silo, variant: 2),
+                new BuildPlan("Büyük Fabrika",  6, 4547, 7366, xp: 8, kind: BuildingKind.Factory, size: 1.2f)),
         };
 
         /// <summary>Total XP needed to reach level i + 1 (so index 0 is level 1 = 0 XP).</summary>
-        public static readonly int[] LevelThresholds = { 0, 2, 5, 8, 12, 17, 23, 30, 38, 47 };
+        public static readonly int[] LevelThresholds = { 0, 4, 10, 16, 24, 34, 46, 60, 76, 94 };
 
         // ---- Repairs: finished buildings sometimes get a problem. No penalty, fixing it pays a bonus.
         public const float RepairInterval = 1500f;       // seconds (25 min) between problems in a district
@@ -53,7 +68,7 @@ namespace Game.Core
         public const int RepairKinds = 4;                // roof leak, broken pipe, bad wiring, cracked wall
         public static int RepairWork(int scale) => 12 * scale;   // a handful of hits even at hammer level 0
         public static int RepairReward(int scale) => 60 * scale;
-        public const int RepairXp = 1;
+        public const int RepairXp = 2;
 
         // ---- Energy: every character (the player and each hired worker) has their own bar. A hit costs energy,
         // standing still refills it, and running dry forces a rest until it has recovered to ResumeFraction.

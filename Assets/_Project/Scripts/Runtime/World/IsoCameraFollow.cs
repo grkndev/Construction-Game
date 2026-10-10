@@ -5,7 +5,8 @@ namespace Game.World
     /// <summary>
     /// Fixed-angle isometric-style follow camera. Kept deliberately simple; swapping to Cinemachine or a
     /// third-person rig later only means replacing this one component.
-    /// <see cref="SetView"/> moves the camera to look at another target from farther away (the dashboard overview).
+    /// <see cref="SetView"/> puts the camera on another target at once (the dashboard map or a district: they are far apart, so a flight
+    /// between them would only show empty sea; the HUD covers the cut with a short fade instead).
     /// </summary>
     public sealed class IsoCameraFollow : MonoBehaviour
     {
@@ -13,41 +14,23 @@ namespace Game.World
         [SerializeField] Vector3 offset = new Vector3(-19f, 21f, -19f);
         [SerializeField] float smoothTime = 0.18f;
 
-        const float TransitionTime = 0.9f;
-
         Vector3 velocity;
-        float scale = 1f, targetScale = 1f, scaleVelocity;
-        float currentSmooth;
+        float scale = 1f;
 
-        void Start()
-        {
-            currentSmooth = smoothTime;
-            Snap();
-        }
+        void Start() => Snap();
 
         void LateUpdate()
         {
             if (target == null) return;
-            currentSmooth = Mathf.MoveTowards(currentSmooth, smoothTime, Time.deltaTime * 0.8f);
-            scale = Mathf.SmoothDamp(scale, targetScale, ref scaleVelocity, currentSmooth);
-            transform.position = Vector3.SmoothDamp(transform.position, target.position + offset * scale, ref velocity, currentSmooth);
+            transform.position = Vector3.SmoothDamp(transform.position, target.position + offset * scale, ref velocity, smoothTime);
         }
 
-        /// <summary>Looks at <paramref name="newTarget"/> from <paramref name="viewScale"/> times the normal distance.</summary>
-        public void SetView(Transform newTarget, float viewScale, bool snap = false)
+        /// <summary>Looks at <paramref name="newTarget"/> from <paramref name="viewScale"/> times the normal distance, immediately.</summary>
+        public void SetView(Transform newTarget, float viewScale)
         {
             target = newTarget;
-            targetScale = viewScale;
-            if (snap)
-            {
-                scale = viewScale;
-                scaleVelocity = 0f;
-                Snap();
-            }
-            else
-            {
-                currentSmooth = TransitionTime;
-            }
+            scale = viewScale;
+            Snap();
         }
 
         public void Snap()

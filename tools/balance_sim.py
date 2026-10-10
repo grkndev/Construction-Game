@@ -1,4 +1,4 @@
-"""Balance simulation for Balance.cs (five districts, upgrades restart in each): every character (the player and each hired worker) has its own energy
+"""Balance simulation for Balance.cs (five districts of six buildings, upgrades restart in each): every character (the player and each hired worker) has its own energy
 meter; a free Sarı Kola refills all of them every 45 s. Greedy upgrade buying, plots worked smallest-first.
 
 Usage: python3 tools/balance_sim.py
@@ -120,10 +120,18 @@ def sim(plans, hammer, worker, stamina, P, W, speed=None, hit_rate=5.5, interval
 PLAYER = (100, 4, 20, 0.6, 0.0, 0.40)   # max, cost, full regen/s, rest delay, regen while acting, resume fraction
 WORKER = (100, 8, 12, 1.0, 0, 0.4)
 
-# Mirror of Balance.Districts (first-district numbers; the game scales work/bonus/prices/power by `scale`), see Balance.cs.
-SHAPE = [(3, 90, 120), (4, 300, 420), (6, 800, 1300)]
-# (name, scale, size): `size` multiplies the buildings' work/bonus on top of the scale so later districts take longer.
-DISTRICTS = [("Sahil", 1, 0.85), ("Merkez", 4, 2.0), ("Liman", 16, 4.0), ("Tepe", 64, 7.0), ("Sanayi", 256, 10.0)]
+# The districts are read straight from Balance.cs (first-district numbers: the game scales work/bonus/prices/power by `scale`).
+def load_districts():
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Assets/_Project/Scripts/Runtime/Core/Balance.cs"), encoding="utf-8").read()
+    out = []
+    for m in re.finditer(r'new DistrictDef\("([^"]+)",\s*requiredLevel:\s*\d+,\s*scale:\s*(\d+),(.*?)\)\),', src, re.S):
+        plans = [(int(f), int(w), int(b)) for f, w, b in re.findall(r'new BuildPlan\("[^"]+",\s*(\d+),\s*(\d+),\s*(\d+)', m.group(3))]
+        out.append((m.group(1), int(m.group(2)), plans))
+    return out
+
+
+DISTRICTS = load_districts()
 HIT_RATE = 1 / 0.35   # PlayerHammer attacks as soon as the cooldown allows (Balance.HitCooldown); energy is the real limit
 
 
@@ -132,9 +140,9 @@ def run_city(seeds=(1, 2, 3)):
     totals = [0.0] * len(DISTRICTS)
     details = []
     for sd in seeds:
-        for i, (name, scale, size) in enumerate(DISTRICTS):
+        for i, (name, scale, shape) in enumerate(DISTRICTS):
             coins = 0.0   # coins are per district
-            plans = [(f, round(w * size) * scale, round(b * size) * scale) for f, w, b in SHAPE]
+            plans = [(f, w * scale, b * scale) for f, w, b in shape]
             r = sim(plans, (20 * scale, 1.5, 25), (90 * scale, 1.75, 8), (60 * scale, 1.6, 10), PLAYER, WORKER, speed=(100 * scale, 2.0),
                     hit_rate=HIT_RATE, seed=sd, scale=scale, coins0=coins)
             totals[i] += r[0]

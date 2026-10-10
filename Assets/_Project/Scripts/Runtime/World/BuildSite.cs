@@ -10,15 +10,13 @@ namespace Game.World
     public enum SiteState { Active, Done, Broken }
 
     /// <summary>
-    /// One construction plot. The building is assembled from primitives at startup (floors, windows,
-    /// roof, scaffolding) and floors pop in as <see cref="BuildProgress"/> crosses each threshold.
+    /// One construction plot. The building is assembled from primitives at startup (see <see cref="BuildingKits"/>: a model
+    /// per building kind, scaffolding around it) and its stages pop in as <see cref="BuildProgress"/> crosses each threshold.
     /// </summary>
     public sealed class BuildSite : MonoBehaviour
     {
-        public const float WorkRadius = 5.4f;
-        const float FloorHeight = 1.1f;
-        const float BaseHeight = 0.3f;
-        const float Width = 3.4f;
+        public const float WorkRadius = 6.2f;
+        const float BaseHeight = BuildingKits.Base;
         const float MaxScaffoldHeight = 4.6f;   // tall towers would otherwise hide the whole screen behind poles
 
         [SerializeField] ToonPalette palette;
@@ -31,6 +29,7 @@ namespace Game.World
         SiteState state;
 
         Transform body;                 // everything that squashes when hit
+        Vector2 footprint;              // x/z size of the finished building, world units
         Transform barRoot, barFill, marker;
         TMP_Text label;
         GameObject scaffold;
@@ -95,54 +94,26 @@ namespace Game.World
         {
             body = new GameObject("Body").transform;
             body.SetParent(transform, false);
+            var model = new GameObject("Model").transform;
+            model.SetParent(body, false);
+            model.localScale = Vector3.one * plan.Size;
 
             var wall = palette.walls[index % palette.walls.Length];
-            var totalHeight = BaseHeight + plan.Floors * FloorHeight;
+            var dim = BuildingKits.BaseDim(plan.Kind);
+            footprint = dim * plan.Size;
 
             // Footprint collider so the player can't walk through the building.
-            var footprint = gameObject.AddComponent<BoxCollider>();
-            footprint.center = new Vector3(0f, 1.2f, 0f);
-            footprint.size = new Vector3(Width + 0.3f, 2.4f, Width + 0.3f);
+            var box = gameObject.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 1.2f, 0f);
+            box.size = new Vector3(footprint.x + 0.3f, 2.4f, footprint.y + 0.3f);
 
-            Prim.Cube(body, "Slab", new Vector3(0f, BaseHeight * 0.5f, 0f), new Vector3(Width + 0.5f, BaseHeight, Width + 0.5f), palette.stone);
+            // Ships are built in a wooden dry dock, everything else on a stone slab.
+            Prim.Cube(model, "Slab", new Vector3(0f, BaseHeight * 0.5f, 0f), new Vector3(dim.x + 0.5f, BaseHeight, dim.y + 0.5f),
+                plan.Kind == BuildingKind.Ship ? palette.crate : palette.stone);
 
-            for (var i = 0; i < plan.Floors; i++)
-            {
-                var floor = new GameObject($"Floor {i + 1}").transform;
-                floor.SetParent(body, false);
-                floor.localPosition = new Vector3(0f, BaseHeight + i * FloorHeight, 0f);
-                Prim.Cube(floor, "Wall", new Vector3(0f, FloorHeight * 0.5f, 0f), new Vector3(Width, FloorHeight - 0.02f, Width), wall);
+            BuildingKits.Build(model, plan, palette, wall, floors, out roof, out flag, out var top);
 
-                // Two windows per face; a door replaces the middle of the front (camera-facing) side on floor 1.
-                for (var side = 0; side < 4; side++)
-                {
-                    var rot = Quaternion.Euler(0f, side * 90f, 0f);
-                    var isDoorSide = i == 0 && side == 0;
-                    if (isDoorSide)
-                    {
-                        Prim.Cube(floor, "Door", rot * new Vector3(0f, 0.42f, -(Width * 0.5f + 0.01f)),
-                            new Vector3(0.75f, 0.84f, 0.1f), palette.door).transform.localRotation = rot;
-                        continue;
-                    }
-                    foreach (var dx in new[] { -0.8f, 0.8f })
-                    {
-                        Prim.Cube(floor, "Window", rot * new Vector3(dx, 0.58f, -(Width * 0.5f + 0.01f)),
-                            new Vector3(0.62f, 0.5f, 0.1f), palette.window).transform.localRotation = rot;
-                    }
-                }
-                floor.gameObject.SetActive(false);
-                floors.Add(floor);
-            }
-
-            roof = new GameObject("Roof").transform;
-            roof.SetParent(body, false);
-            roof.localPosition = new Vector3(0f, totalHeight, 0f);
-            Prim.Cube(roof, "Cap", new Vector3(0f, 0.17f, 0f), new Vector3(Width + 0.5f, 0.34f, Width + 0.5f), palette.roof);
-            Prim.Cylinder(roof, "Pole", new Vector3(0.9f, 0.9f, 0.9f), new Vector3(0.08f, 0.55f, 0.08f), palette.scaffold);
-            flag = Prim.Cube(roof, "Flag", new Vector3(1.2f, 1.25f, 0.9f), new Vector3(0.55f, 0.32f, 0.05f), palette.flag).transform;
-            roof.gameObject.SetActive(false);
-
-            BuildScaffold(Mathf.Min(totalHeight + 0.35f, MaxScaffoldHeight));
+            BuildScaffold(Mathf.Min(top * plan.Size + 0.35f, MaxScaffoldHeight));
             BuildBar();
         }
 
@@ -150,17 +121,18 @@ namespace Game.World
         {
             scaffold = new GameObject("Scaffold");
             scaffold.transform.SetParent(transform, false);
-            var half = Width * 0.5f + 0.15f;
+            var hx = footprint.x * 0.5f + 0.15f;
+            var hz = footprint.y * 0.5f + 0.15f;
             foreach (var sx in new[] { -1f, 1f })
             foreach (var sz in new[] { -1f, 1f })
-                Prim.Cylinder(scaffold.transform, "Post", new Vector3(sx * half, height * 0.5f, sz * half),
+                Prim.Cylinder(scaffold.transform, "Post", new Vector3(sx * hx, height * 0.5f, sz * hz),
                     new Vector3(0.14f, height * 0.5f, 0.14f), palette.scaffold);
 
             // Top rails make the future building's silhouette readable from the start.
             foreach (var s in new[] { -1f, 1f })
             {
-                Prim.Cube(scaffold.transform, "RailX", new Vector3(0f, height, s * half), new Vector3(half * 2f, 0.1f, 0.1f), palette.scaffold);
-                Prim.Cube(scaffold.transform, "RailZ", new Vector3(s * half, height, 0f), new Vector3(0.1f, 0.1f, half * 2f), palette.scaffold);
+                Prim.Cube(scaffold.transform, "RailX", new Vector3(0f, height, s * hz), new Vector3(hx * 2f, 0.1f, 0.1f), palette.scaffold);
+                Prim.Cube(scaffold.transform, "RailZ", new Vector3(s * hx, height, 0f), new Vector3(0.1f, 0.1f, hz * 2f), palette.scaffold);
             }
 
             // Thin poles cast long, noisy shadow lines across the island; the scaffold reads fine without them.
@@ -173,7 +145,7 @@ namespace Game.World
             // Floats in front of the corner facing the camera (not above the centre), so a growing tower can't hide it.
             barRoot = new GameObject("ProgressBar").transform;
             barRoot.SetParent(transform, false);
-            barRoot.localPosition = new Vector3(-2.3f, 4.9f, -2.3f);
+            barRoot.localPosition = new Vector3(-(footprint.x * 0.5f + 0.6f), 4.9f, -(footprint.y * 0.5f + 0.6f));
             barRoot.gameObject.AddComponent<Billboard>();
 
             Prim.Cube(barRoot, "Back", Vector3.zero, new Vector3(3.2f, 0.34f, 0.08f), palette.barBack);
@@ -322,7 +294,7 @@ namespace Game.World
         public Vector3 WorkSlot(int n)
         {
             var angle = (n * 137.5f + 200f) * Mathf.Deg2Rad;
-            var p = transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 3.3f;
+            var p = transform.position + new Vector3(Mathf.Cos(angle) * (footprint.x * 0.5f + 1.3f), 0f, Mathf.Sin(angle) * (footprint.y * 0.5f + 1.3f));
             p.y = 0f;
             return p;
         }

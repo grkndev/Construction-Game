@@ -5,14 +5,16 @@ namespace Game.Audio
 {
     /// <summary>
     /// Plays the game's music and sound effects. It only listens to <see cref="GameController"/> (nothing else calls it except
-    /// the UI buttons for clicks): the controller says what happened, this decides how it sounds. Music and effects can be
-    /// switched off separately; the choice is remembered. Automated runs (-shot / -demo) are silent unless -sound is passed.
+    /// the UI buttons for clicks): the controller says what happened, this decides how it sounds. Music and effects each have a
+    /// level (0..1, set in the settings window); the choice is remembered. Automated runs (-shot / -demo) are silent unless -sound is passed.
     /// </summary>
     public sealed class AudioManager : MonoBehaviour
     {
         const int VoiceCount = 10;
-        const string MusicKey = "audio.music";
-        const string SfxKey = "audio.sfx";
+        const string MusicKey = "audio.music.level";
+        const string SfxKey = "audio.sfx.level";
+        const string OldMusicKey = "audio.music";   // before levels: an on/off switch
+        const string OldSfxKey = "audio.sfx";
         const float MusicVolume = 0.42f;
         const float SfxVolume = 0.9f;
         const float WorkerHitVolume = 0.28f;
@@ -28,15 +30,16 @@ namespace Game.Audio
         int nextVoice;
         float lastWorkerHit = -10f;
         float musicMix;       // 0 = dashboard track, 1 = district track
-        bool musicOn = true, sfxOn = true;
+        float musicLevel = 1f, sfxLevel = 1f;
+        float lastClick = -10f;
 
-        public bool MusicOn => musicOn;
-        public bool SfxOn => sfxOn;
+        public float MusicLevel => musicLevel;
+        public float SfxLevel => sfxLevel;
 
         void Awake()
         {
-            musicOn = PlayerPrefs.GetInt(MusicKey, 1) != 0;
-            sfxOn = PlayerPrefs.GetInt(SfxKey, 1) != 0;
+            musicLevel = LoadLevel(MusicKey, OldMusicKey);
+            sfxLevel = LoadLevel(SfxKey, OldSfxKey);
 
             dashboardSource = NewSource(musicDashboard, loop: true);
             districtSource = NewSource(musicDistrict, loop: true);
@@ -60,6 +63,13 @@ namespace Game.Audio
             if (game != null) game.Sfx -= OnSfx;
         }
 
+        // The level key wins; a save from before levels only has the old on/off switch (off = 0, on = full).
+        static float LoadLevel(string key, string oldKey)
+        {
+            if (PlayerPrefs.HasKey(key)) return Mathf.Clamp01(PlayerPrefs.GetFloat(key, 1f));
+            return PlayerPrefs.GetInt(oldKey, 1) != 0 ? 1f : 0f;
+        }
+
         AudioSource NewSource(AudioClip clip, bool loop)
         {
             var source = gameObject.AddComponent<AudioSource>();
@@ -80,7 +90,7 @@ namespace Game.Audio
 
         void ApplyMusicVolumes(bool immediate)
         {
-            var master = musicOn ? MusicVolume : 0f;
+            var master = MusicVolume * musicLevel;
             var dashboard = master * Mathf.Cos(musicMix * Mathf.PI * 0.5f);
             var district = master * Mathf.Sin(musicMix * Mathf.PI * 0.5f);
             dashboardSource.volume = immediate ? dashboard : Mathf.MoveTowards(dashboardSource.volume, dashboard, Time.unscaledDeltaTime * 2f);
@@ -90,19 +100,20 @@ namespace Game.Audio
         // Phones: silence when the app goes to the background; browsers: when the tab loses focus.
         void OnApplicationFocus(bool focused) => AudioListener.pause = !focused;
 
-        public void SetMusic(bool on)
+        public void SetMusicLevel(float level)
         {
-            musicOn = on;
-            PlayerPrefs.SetInt(MusicKey, on ? 1 : 0);
+            musicLevel = Mathf.Clamp01(level);
+            PlayerPrefs.SetFloat(MusicKey, musicLevel);
             PlayerPrefs.Save();
         }
 
-        public void SetSfx(bool on)
+        public void SetSfxLevel(float level)
         {
-            sfxOn = on;
-            PlayerPrefs.SetInt(SfxKey, on ? 1 : 0);
+            sfxLevel = Mathf.Clamp01(level);
+            PlayerPrefs.SetFloat(SfxKey, sfxLevel);
             PlayerPrefs.Save();
-            if (on) Play(SfxKind.Click);
+            // A tick lets the player hear the new level while dragging the slider (not on every pixel of the drag).
+            if (Time.unscaledTime - lastClick > 0.12f) { lastClick = Time.unscaledTime; Play(SfxKind.Click); }
         }
 
         public void Click() => Play(SfxKind.Click);
@@ -111,7 +122,7 @@ namespace Game.Audio
 
         void Play(SfxKind kind)
         {
-            if (!sfxOn || (int)kind >= sfx.Length || sfx[(int)kind] == null) return;
+            if (sfxLevel <= 0f || (int)kind >= sfx.Length || sfx[(int)kind] == null) return;
 
             var volume = SfxVolume;
             var pitch = 1f;
@@ -137,7 +148,7 @@ namespace Game.Audio
             var voice = voices[nextVoice];
             nextVoice = (nextVoice + 1) % voices.Length;
             voice.clip = sfx[(int)kind];
-            voice.volume = volume;
+            voice.volume = volume * sfxLevel;
             voice.pitch = pitch;
             // The level-up jingle waits for the building fanfare; the "Coşku" whoosh for the purchase ping.
             var delay = kind == SfxKind.LevelUp ? 0.75f : kind == SfxKind.Boost ? 0.12f : 0f;

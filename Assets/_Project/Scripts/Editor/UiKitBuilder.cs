@@ -22,13 +22,15 @@ namespace Game.Editor
         public static Sprite BarFill => Load("BarFill", 32, 32, 16, 12, p => Fill(p, 32, 32, 16));
         public static Sprite Coin => Load("Coin", 96, 96, 0, 0, CoinPixel);
         public static Sprite Star => Load("Star", 96, 96, 0, 0, p => Poly(p, 96, StarPoints(), new Color(1f, 0.85f, 0.2f)));
+        public static Sprite Knob => Load("Knob", 64, 64, 0, 0, KnobPixel);
+        public static Sprite Gear => Load("Gear", 96, 96, 0, 0, GearPixel);
         public static Sprite Bolt => Load("Bolt", 96, 96, 0, 0, p => Poly(p, 96, BoltPoints(), new Color(0.5f, 0.95f, 0.4f)));
 
         [MenuItem("Tools/Project/Rebuild UI Kit")]
         public static void Rebuild()
         {
             if (Directory.Exists(Dir)) foreach (var f in Directory.GetFiles(Dir, "*.png")) AssetDatabase.DeleteAsset(f.Replace('\\', '/'));
-            _ = Panel; _ = Button; _ = BarBack; _ = BarFill; _ = Coin; _ = Star; _ = Bolt;
+            _ = Panel; _ = Button; _ = BarBack; _ = BarFill; _ = Coin; _ = Star; _ = Bolt; _ = Knob; _ = Gear;
             AssetDatabase.SaveAssets();
         }
 
@@ -122,6 +124,32 @@ namespace Game.Editor
             if (p.y > 50f && p.x < 40f && dist > 8f && Vector2.Distance(p, new Vector2(34f, 62f)) < 9f) return new Color(1f, 0.95f, 0.65f);   // shine
             if (InPolygon(p, Scale(StarPoints(), 0.36f, c))) return new Color(0.9f, 0.58f, 0.1f);   // embossed star
             return body;
+        }
+
+        // Slider handle: outlined disc with a highlight and a darker underside (white-ish so it can be tinted).
+        static Color KnobPixel(Vector2 p)
+        {
+            var d = Vector2.Distance(p, new Vector2(32f, 32f));
+            if (d > 30f) return Color.clear;
+            if (d > 26f) return Ink;
+            if (Vector2.Distance(p, new Vector2(24f, 40f)) < 7f) return Color.white;
+            var shade = p.y < 16f ? 0.76f : 0.93f;
+            return new Color(shade, shade, shade, 1f);
+        }
+
+        // Settings icon: a toothed wheel with a hole. Square teeth come from the sign of sin(8 * angle); the ink shape is
+        // the body shape grown a little, which outlines the tooth sides as well as the rim.
+        static Color GearPixel(Vector2 p)
+        {
+            var v = p - new Vector2(48f, 48f);
+            var r = v.magnitude;
+            var s = Mathf.Sin(Mathf.Atan2(v.y, v.x) * 8f);
+            var inkEdge = s > -0.14f ? 45f : 36f;
+            var bodyEdge = s > 0.14f ? 41f : 32f;
+            if (r > inkEdge || r < 9f) return Color.clear;
+            if (r > bodyEdge || r < 14f) return Ink;
+            var shade = p.y > 54f ? 0.97f : 0.82f;
+            return new Color(shade * 0.78f, shade * 0.82f, shade, 1f);
         }
 
         // Two-tone polygon: the whole shape in ink, then the same shape shrunk about its centre in the fill colour.
