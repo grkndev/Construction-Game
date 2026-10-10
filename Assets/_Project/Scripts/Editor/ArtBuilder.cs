@@ -143,6 +143,23 @@ namespace Game.Editor
             return mat;
         }
 
+        // Stores a generated mesh as an asset (refilled in place, so its GUID and the scene references stay stable).
+        static Mesh SaveMesh(string name, Mesh generated)
+        {
+            EditorWire.EnsureFolder("Assets/_Project/Art/Meshes");
+            var path = $"Assets/_Project/Art/Meshes/{name}.asset";
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (mesh == null)
+            {
+                AssetDatabase.CreateAsset(generated, path);
+                return generated;
+            }
+            EditorUtility.CopySerialized(generated, mesh);
+            EditorUtility.SetDirty(mesh);
+            Object.DestroyImmediate(generated);
+            return mesh;
+        }
+
         public static ToonPalette BuildPalette()
         {
             EditorWire.EnsureFolder(MaterialsDir);
@@ -155,6 +172,9 @@ namespace Game.Editor
                 palette = ScriptableObject.CreateInstance<ToonPalette>();
                 AssetDatabase.CreateAsset(palette, PalettePath);
             }
+
+            palette.sphereMesh = SaveMesh("LowPolySphere", LowPolyMeshes.CreateSphere("LowPolySphere"));
+            palette.cylinderMesh = SaveMesh("LowPolyCylinder", LowPolyMeshes.CreateCylinder("LowPolyCylinder"));
 
             palette.grass = Mat("Grass", "#86DB5B", 0.003f);
             palette.dirt = Mat("Dirt", "#D79C66", 0f);

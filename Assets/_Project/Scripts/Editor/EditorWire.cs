@@ -48,6 +48,16 @@ namespace Game.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        public static void SetVector3Array(Object target, string field, Vector3[] values)
+        {
+            var so = new SerializedObject(target);
+            var prop = so.FindProperty(field) ?? throw new System.ArgumentException($"{target.GetType().Name} has no serialized field '{field}'");
+            prop.arraySize = values.Length;
+            for (var i = 0; i < values.Length; i++)
+                prop.GetArrayElementAtIndex(i).vector3Value = values[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static void EnsureFolder(string assetPath)
         {
             if (AssetDatabase.IsValidFolder(assetPath)) return;

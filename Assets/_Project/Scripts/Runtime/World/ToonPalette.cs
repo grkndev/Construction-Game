@@ -10,6 +10,10 @@ namespace Game.World
     [CreateAssetMenu(menuName = "Construction/Toon Palette")]
     public sealed class ToonPalette : ScriptableObject
     {
+        [Header("Meshes")]
+        public Mesh sphereMesh;      // low-poly stand-ins for the built-in primitives (see LowPolyMeshes / Prim.UseMeshes)
+        public Mesh cylinderMesh;
+
         [Header("Environment")]
         public Material grass;
         public Material dirt;

@@ -5,6 +5,15 @@ namespace Game.World
     /// <summary>Helpers to assemble props out of Unity primitives (our placeholder-art approach).</summary>
     public static class Prim
     {
+        static Mesh lowPolySphere, lowPolyCylinder;
+
+        /// <summary>Swaps the built-in sphere and cylinder meshes for the palette's low-poly ones in everything made afterwards (null = keep the built-ins).</summary>
+        public static void UseMeshes(Mesh sphere, Mesh cylinder)
+        {
+            lowPolySphere = sphere;
+            lowPolyCylinder = cylinder;
+        }
+
         public static GameObject Make(PrimitiveType type, Transform parent, string name, Vector3 localPos,
             Vector3 localScale, Material material, bool keepCollider = false)
         {
@@ -15,6 +24,8 @@ namespace Game.World
             t.localPosition = localPos;
             t.localScale = localScale;
             go.GetComponent<Renderer>().sharedMaterial = material;
+            var swap = type == PrimitiveType.Sphere ? lowPolySphere : type == PrimitiveType.Cylinder ? lowPolyCylinder : null;
+            if (swap != null) go.GetComponent<MeshFilter>().sharedMesh = swap;
             if (!keepCollider)
             {
                 var col = go.GetComponent<Collider>();

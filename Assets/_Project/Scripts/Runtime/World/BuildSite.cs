@@ -113,6 +113,10 @@ namespace Game.World
 
             BuildingKits.Build(model, plan, palette, wall, floors, out roof, out flag, out var top);
 
+            // ~70 primitives per building become a few merged meshes per stage; the flag (droops when broken) and turning blades stay separate.
+            foreach (var stage in floors) MeshCombiner.Combine(stage, t => t == flag);
+            MeshCombiner.Combine(roof, t => t == flag || t.GetComponent<Spin>() != null);
+
             BuildScaffold(Mathf.Min(top * plan.Size + 0.35f, MaxScaffoldHeight));
             BuildBar();
         }

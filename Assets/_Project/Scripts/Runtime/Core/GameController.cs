@@ -98,6 +98,7 @@ namespace Game.Core
         public event Action<string, float> Story;
 
         DistrictState[] states;
+        bool[] built;   // districts whose buildings exist (they are made on the first visit, not at startup)
         readonly Economy noEconomy = new Economy();
         readonly Dictionary<BuildSite, (int district, int plot)> siteLookup = new Dictionary<BuildSite, (int, int)>();
         readonly List<AutoWorker> workers = new List<AutoWorker>();
@@ -113,6 +114,8 @@ namespace Game.Core
 
         void Awake()
         {
+            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh);   // low-poly spheres and cylinders for everything built from here on
+            if (Application.isMobilePlatform) Application.targetFrameRate = 60;   // phones default to 30
             playerController = player.GetComponent<PlayerController>();
 
             states = new DistrictState[districts.Length];
@@ -136,21 +139,7 @@ namespace Game.Core
                 if (away > 0) foreach (var state in states) RepairSchedule.Advance(state, Math.Min(away, 7 * 86400.0), random);
             }
 
-            // Every plot's building is built once up front (the dashboard shows them all) and put back as saved.
-            for (var d = 0; d < districts.Length; d++)
-            {
-                var sites = districts[d].Sites;
-                for (var p = 0; p < sites.Length; p++)
-                {
-                    sites[p].Initialize(states[d].Def.Plans[p], d * sites.Length + p, sites[p].GetComponentInChildren<TMPro.TMP_Text>(true));
-                    sites[p].Restore(states[d].PlotWork[p]);
-                    sites[p].Completed += OnSiteCompleted;
-                    sites[p].FloorBuilt += _ => Sfx?.Invoke(SfxKind.FloorBuilt);
-                    siteLookup[sites[p]] = (d, p);
-                    if (states[d].IsPlotComplete(p)) SpawnResident(d, p, announce: false);
-                    ApplyIssue(d, p);
-                }
-            }
+            built = new bool[districts.Length];
             CityComplete = AllDistrictsComplete();
 
             Boost.Changed += OnBuffsChanged;
@@ -234,6 +223,27 @@ namespace Game.Core
 
         // ---------- dashboard <-> district ----------
 
+        /// <summary>
+        /// Builds a district's buildings (put back as saved) the first time they are needed: its first visit, or a testing hook. Nothing is built
+        /// for districts the player never opens, which keeps start-up and memory small.
+        /// </summary>
+        public void EnsureBuilt(int d)
+        {
+            if (built[d]) return;
+            built[d] = true;
+            var sites = districts[d].Sites;
+            for (var p = 0; p < sites.Length; p++)
+            {
+                sites[p].Initialize(states[d].Def.Plans[p], d * sites.Length + p, sites[p].GetComponentInChildren<TMPro.TMP_Text>(true));
+                sites[p].Restore(states[d].PlotWork[p]);
+                sites[p].Completed += OnSiteCompleted;
+                sites[p].FloorBuilt += _ => Sfx?.Invoke(SfxKind.FloorBuilt);
+                siteLookup[sites[p]] = (d, p);
+                if (states[d].IsPlotComplete(p)) SpawnResident(d, p, announce: false);
+                ApplyIssue(d, p);
+            }
+        }
+
         void ShowDashboard()
         {
             Mode = GameMode.Dashboard;
@@ -260,6 +270,7 @@ namespace Game.Core
                 return false;
             }
 
+            EnsureBuilt(index);
             Mode = GameMode.InDistrict;
             CurrentIndex = index;
             for (var d = 0; d < districts.Length; d++) districts[d].SetVisible(d == index);
@@ -454,6 +465,7 @@ namespace Game.Core
         // Makes the building (and its resident) match the problem recorded in the district state.
         void ApplyIssue(int d, int p)
         {
+            if (!built[d]) return;   // applied when the district is built
             var site = districts[d].Sites[p];
             var kind = states[d].Issues[p];
             site.SetIssue(kind);
@@ -481,6 +493,7 @@ namespace Game.Core
         /// <summary>Testing hook (see DevCommands): gives a finished building a problem right now.</summary>
         public void ForceIssue(int district, int plot, int kind)
         {
+            EnsureBuilt(district);
             states[district].Break(plot, kind);
             ApplyIssue(district, plot);
             StateChanged?.Invoke();

@@ -68,6 +68,8 @@ namespace Game.UI
 
         void OnModeChanged()
         {
+            lastEnergy = lastEnergyMax = lastBoostKind = lastBoostTenths = -1;   // the plates below are cleared or refilled: forget what they showed
+            lastPlateKey = (null, -1, -1, -1);
             districtGroup.SetActive(game.InDistrict);
             coinPanel.gameObject.SetActive(game.InDistrict);   // coins belong to a district: the map shows none
             levelPanel.anchoredPosition = new Vector2(levelPanel.anchoredPosition.x, game.InDistrict ? -150f : -40f);
@@ -118,6 +120,10 @@ namespace Game.UI
             hintTimer = seconds;
         }
 
+        // What the polled labels last showed (see Update).
+        int lastEnergy = -1, lastEnergyMax = -1, lastBoostKind = -1, lastBoostTenths = -1;
+        (Game.World.BuildSite, int, int, int) lastPlateKey = (null, -1, -1, -1);
+
         void Update()
         {
             if (game == null) return;
@@ -148,19 +154,42 @@ namespace Game.UI
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
             var energy = game.PlayerEnergy;
             SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
-            playerEnergyLabel.text = $"ENERJİ  {Mathf.CeilToInt(energy.Value)} / {Mathf.RoundToInt(energy.Max)}";
+
+            // Only touch text and layout when something visible changed: rebuilding a TMP mesh (and allocating its string) every frame adds up.
+            var shown = Mathf.CeilToInt(energy.Value);
+            var max = Mathf.RoundToInt(energy.Max);
+            if (shown != lastEnergy || max != lastEnergyMax)
+            {
+                lastEnergy = shown;
+                lastEnergyMax = max;
+                playerEnergyLabel.text = $"ENERJİ  {shown} / {max}";
+            }
             var capacity = Mathf.InverseLerp(Balance.PlayerEnergy.Max,
                 Balance.WithStamina(Balance.PlayerEnergy, Balance.MaxStaminaLevel - 1).Max, energy.Max);
-            playerEnergyBack.sizeDelta = new Vector2(Mathf.Lerp(EnergyBarMinWidth, EnergyBarMaxWidth, capacity), playerEnergyBack.sizeDelta.y);
+            var barWidth = Mathf.Lerp(EnergyBarMinWidth, EnergyBarMaxWidth, capacity);
+            if (!Mathf.Approximately(playerEnergyBack.sizeDelta.x, barWidth)) playerEnergyBack.sizeDelta = new Vector2(barWidth, playerEnergyBack.sizeDelta.y);
 
-            if (game.Boost.IsActive) boostPlate.Text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";
-            else if (game.LevelBuff.IsActive) boostPlate.Text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
-            else boostPlate.Text = "";
+            var boostKind = game.Boost.IsActive ? 1 : game.LevelBuff.IsActive ? 2 : 0;
+            var boostTenths = boostKind == 1 ? Mathf.RoundToInt(game.Boost.Remaining * 10f) : boostKind == 2 ? Mathf.RoundToInt(game.LevelBuff.Remaining * 10f) : 0;
+            if (boostKind != lastBoostKind || boostTenths != lastBoostTenths)
+            {
+                lastBoostKind = boostKind;
+                lastBoostTenths = boostTenths;
+                if (boostKind == 1) boostPlate.Text = $"COŞKU!  Sv +{Balance.LevelBonus}  hızlı  {game.Boost.Remaining:0.0}s";
+                else if (boostKind == 2) boostPlate.Text = $"SEVİYE +{Balance.LevelBonus}  {game.LevelBuff.Remaining:0.0}s";
+                else boostPlate.Text = "";
+            }
 
             var focus = game.FocusSite;
-            buildingPlate.Text = focus != null
-                ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
-                : $"{game.CurrentState.Def.Name}  {game.CompletedCount}/{game.TotalCount}";
+            var plateKey = (focus, focus != null ? focus.FloorsBuilt : game.CompletedCount,
+                focus != null ? Mathf.FloorToInt(focus.Fraction * 100f) : game.TotalCount, game.CurrentIndex);
+            if (plateKey != lastPlateKey)
+            {
+                lastPlateKey = plateKey;
+                buildingPlate.Text = focus != null
+                    ? $"{focus.Plan.Name}   Kat {focus.FloorsBuilt}/{focus.Plan.Floors}   %{Mathf.FloorToInt(focus.Fraction * 100f)}"
+                    : $"{game.CurrentState.Def.Name}  {game.CompletedCount}/{game.TotalCount}";
+            }
         }
 
         static void SetBar(RectTransform fill, Image image, float fraction, bool exhausted)

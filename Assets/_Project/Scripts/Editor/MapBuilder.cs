@@ -53,6 +53,7 @@ namespace Game.Editor
 
             var anchors = new Transform[provinces.Length];
             var random = new System.Random(5);
+            var trees = new List<Vector3>();
             for (var i = 0; i < provinces.Length; i++)
             {
                 var centre = MapGeometry.Centroid(provinces[i]);
@@ -67,13 +68,14 @@ namespace Game.Editor
 
                 var outward = Mathf.Atan2(centre.y, centre.x) * Mathf.Rad2Deg;
                 GameSceneBuilder.BuildLandmark(root, p, i, new Vector3(landmarkSpot.x, 0f, landmarkSpot.y), outward, 1.9f, onLand: true);
-                Scatter(root, p, provinces[i], new[] { landmarkSpot, cardSpot }, random, 26);
+                Scatter(trees, provinces[i], new[] { landmarkSpot, cardSpot }, random, 26);
             }
+            GameSceneBuilder.BuildForest(root, trees, p);
             return new Result { Root = root.gameObject, Anchors = anchors };
         }
 
         // Trees at random spots well inside a province, away from its landmark and its card.
-        static void Scatter(Transform root, ToonPalette p, List<Vector2> province, Vector2[] keepClear, System.Random random, int count)
+        static void Scatter(List<Vector3> trees, List<Vector2> province, Vector2[] keepClear, System.Random random, int count)
         {
             float minX = province.Min(v => v.x), maxX = province.Max(v => v.x), minY = province.Min(v => v.y), maxY = province.Max(v => v.y);
             var placed = 0;
@@ -83,7 +85,7 @@ namespace Game.Editor
                 if (!MapGeometry.Contains(province, spot)) continue;
                 if (MapGeometry.DistanceToEdges(province, spot) < 3.2f) continue;
                 if (keepClear.Any(c => Vector2.Distance(spot, c) < 7.5f)) continue;
-                GameSceneBuilder.BuildTree(root, new Vector3(spot.x, 0f, spot.y), 1.15f + (float)random.NextDouble() * 0.5f, p, collider: false);
+                trees.Add(new Vector3(spot.x, spot.y, 1.15f + (float)random.NextDouble() * 0.5f));
                 placed++;
             }
         }

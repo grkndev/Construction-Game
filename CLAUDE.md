@@ -30,7 +30,7 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 ## Komutlar (hepsi batchmode, editör kapalı olmalı)
 - `scripts/setup.sh [rebuild]` — TMP + ayarlar + sahne/prefab/materyal üretimi. `rebuild` sahneyi sıfırdan yazar.
 - `scripts/compile.sh` — derle. `scripts/test.sh` — EditMode testleri.
-- `scripts/build.sh mac|web` — build (`mac fast` = Mono, sadece hızlı görsel kontrol). `win` yazılı ama Windows modülü kurulu değil, denenmedi.
+- `scripts/build.sh mac|web` — build (`mac fast` = Mono, sadece hızlı görsel kontrol; `web release` = sıkıştırılmış/küçültülmüş). `win` yazılı ama Windows modülü kurulu değil, denenmedi.
 - Loglar `Logs/` altında; `error CS` ya da hata kodu varsa script ≠ 0 döner.
 - Build'i görsel doğrulama: `Construction -shot dosya.png -shotDelay 5 [bayraklar]` (oyunun kendi karesini yazar; **`-nographics` kullanma**, kare bozuk çıkar; log için `-logFile`). Masaüstü ekran görüntüsü alma. Bayraklar (`Core/DevCommands.cs`): `-demo` otomatik oynar (mahalleleri sırayla gezer), `-enter N` mahalle aç, `-xp N`/`-coins N` ver, `-finish N` mahalleyi bitir (`-finishAll`: tüm şehir), `-break N` iki binayı boz, `-shop` mağazayı aç, `-speed N` hızlandır (yüksek hızda kare süresi sınırı yüzünden vuruş sayısı bozulur, süre ölçmek için kullanma), `-reset` kaydı sil. `-demo` ve `-shot` gerçek kayda dokunmaz (test için `-persist`).
 - Dengeyi `python3 tools/balance_sim.py` ile kontrol et (5 mahalle, her birinde yükseltmeler sıfırdan). Model şu an ~39 dk (tüm yükseltmelerle, kazanç = işin %60'ı), gerçek oyun yürüme dahil ~49 dk. Simülasyon planları doğrudan `Balance.cs`'ten okur. Oyuncu vuruşu yavaş (0.35 sn), işçiler hızlı (0.8 sn): işçiler asıl iş gücü.
@@ -41,6 +41,15 @@ Casual, çizgi film tarzında basit bir inşaat oyunu (Unity 6, URP). Önceki "g
 - `GameController` sahnenin kompozisyon kökü (modlar: Dashboard / InDistrict, kayıt, seviye, mağaza işlemleri); singleton yok, referanslar sahnede `EditorWire` ile bağlanır. Tek sahne (`Main.unity`): her mahalle ayrı kök GameObject (`District`), dashboard hepsini açar, mahalle ziyareti sadece birini.
 - `Player/`, `World/`, `UI/` MonoBehaviour katmanı (`GameHud` mahalle içi, `DashboardHud` harita, `ShopPanel`). Yeni içerik: yeni bina = `Balance.Districts[..]`'e `BuildPlan`; yeni mahalle = `Balance.Districts` + `GameSceneBuilder.BuildDistrict`/`BuildLandmark`; yeni dünya = ileride `MapDefinition` (kayıtta `mapId` hazır).
 - Tween için DOTween yok (OpenUPM'den kalkmış); `Easing.cs` + Update tabanlı animasyonlar.
+
+## Performans (ölçerek yapıldı)
+- `-stats` bayrağı (`-shot` ile) canlı renderer/üçgen/GameObject sayısını ve ilk mahalle girişi süresini loglar; `Tools/Project/Print Scene Stats` (`SceneStats`) kayıtlı sahneyi ölçer. Bir mahalle ≈ 400 renderer / 143 bin üçgen, harita ekranı ≈ 74 renderer / 47 bin üçgen; sahne dosyası ≈ 6 MB. Bunları kötüleştirecek bir değişiklik yapınca tekrar ölç.
+- **Düşük poligonlu küre/silindir** (`World/LowPolyMeshes.cs`, palette'te asset): `Prim.Sphere/Cylinder` bunları kullanır (Unity'nin küresi 768 üçgen). `GameController.Awake` ve sahne builder `Prim.UseMeshes` çağırır; yeni kod yine `Prim.*` kullansın.
+- **Birleştirme:** `MeshCombiner` bir binanın ~70 parçasını aşama başına birkaç mesh'e indirir (`BuildSite`); bayrak ve dönen kanatlar ayrı kalır. Ağaçlar sahnede sadece konum olarak durur, `World/Forest.cs` ilk kullanımda 24 birimlik parçalar halinde birleştirir (kamera dışındakiler çizilmez); çit `MergeChildren` ile. Çarpışması gereken ağaç/sandık tek tek nesne kalır.
+- **Tembel kurulum:** mahalle kökleri sahnede kapalıdır; binalar ve sakinler `GameController.EnsureBuilt` ile ilk girişte kurulur (başlangıçta 30 bina kurulmaz). Geliştirici bayrakları (`-finish`, `-break`...) kendileri çağırır.
+- **HUD:** her kare yazı/layout güncellenmez, değer değişince güncellenir (`GameHud.Update` önbellekleri; mod değişince sıfırlanır).
+- **Render ayarları** (`ProjectSettingsApplier`): gölge mesafesi 150, HDR kapalı; mobilde 60 FPS hedefi (`GameController.Awake`).
+- **WebGL:** `scripts/build.sh web release` Brotli + yüksek kod küçültme: ~52 MB → ~11 MB (tarayıcıda denendi). Geliştirme build'i (`web`) sıkıştırmasız, her statik sunucuda çalışır.
 
 ## Çalışma kuralları
 - `.unity/.prefab/.asset` YAML'ı elle yazma; Editor script'iyle üret (`GameSceneBuilder`, `ArtBuilder`). `Ensure*` yalnızca eksik olanı üretir, `Rebuild*` zorlar (fileID'ler rastgele olduğu için gereksiz yeniden üretme git diff'ini kirletir).

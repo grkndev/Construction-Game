@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Game.Audio;
 using Game.Core;
@@ -49,6 +50,7 @@ namespace Game.Editor
             var outlineMat = ArtBuilder.EnsureOutlineMaterial(font);
             ArtBuilder.EnsurePrefabs(palette, font, outlineMat, force: true);   // Rebuild regenerates prefabs too
 
+            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh);   // everything below is made of the low-poly sphere/cylinder
             BuildLight();
             BuildSea(palette);
 
@@ -202,7 +204,7 @@ namespace Game.Editor
             // Outside the fence: a forest across everything the camera can show (dense near the fence, thin further out), no coast side.
             // (x, z) of every candidate comes from a jittered grid so rows do not look ruled.
             const float step = 4.6f;
-            var forest = 0;
+            var forestTrees = new List<Vector3>();
             for (var gx = -limit[1] + 2f; gx <= limit[0] - 2f; gx += step)
             for (var gz = -limit[3] + 2f; gz <= limit[2] - 2f; gz += step)
             {
@@ -213,13 +215,14 @@ namespace Game.Editor
                 if (spot.x > limit[0] - 1f || spot.x < -limit[1] + 1f || spot.z > limit[2] - 1f || spot.z < -limit[3] + 1f) continue;
                 if (Vector3.Distance(spot, landmarkSpot) < 6f) continue;
                 if (beyond > 13f && Rand(0f, 1f) > 0.3f) continue;   // thinner away from the fence
-                BuildTree(t, spot, Rand(0.9f, 1.25f), p, collider: false);
-                forest++;
+                forestTrees.Add(new Vector3(spot.x, spot.z, Rand(0.9f, 1.25f)));   // x, z, scale: drawn as merged chunks by Forest
             }
-            Debug.Log($"[Scene] {def.Name}: {forest} forest trees, ground x {-limit[1]:0}..{limit[0]:0}, z {-limit[3]:0}..{limit[2]:0}");
+            BuildForest(t, forestTrees, p);
+            Debug.Log($"[Scene] {def.Name}: {forestTrees.Count} forest trees, ground x {-limit[1]:0}..{limit[0]:0}, z {-limit[3]:0}..{limit[2]:0}");
 
             var barriers = new GameObject("Barriers").transform;
             barriers.SetParent(t, false);
+            barriers.gameObject.AddComponent<MergeChildren>();   // posts and rails become a few meshes on first use
             var edge = HalfSize + 0.2f;
             if (coast != 0) BuildFence(barriers, new Vector2(edge, -edge), new Vector2(edge, edge), p);
             if (coast != 1) BuildFence(barriers, new Vector2(-edge, -edge), new Vector2(-edge, edge), p);
@@ -241,7 +244,20 @@ namespace Game.Editor
             EditorWire.Set(district, "playerSpawn", playerSpawn);
             EditorWire.Set(district, "workerSpawn", workerSpawn);
             EditorWire.SetFloat(district, "halfSize", HalfSize);
+            root.SetActive(false);   // switched on by the first visit; its forest and fence are merged then, not at startup
             return district;
+        }
+
+        internal static void BuildForest(Transform parent, List<Vector3> trees, ToonPalette p)
+        {
+            var go = new GameObject("Forest");
+            go.transform.SetParent(parent, false);
+            var forest = go.AddComponent<Forest>();
+            EditorWire.Set(forest, "sphereMesh", p.sphereMesh);
+            EditorWire.Set(forest, "cylinderMesh", p.cylinderMesh);
+            EditorWire.Set(forest, "leaves", p.leaves);
+            EditorWire.Set(forest, "trunk", p.trunk);
+            EditorWire.SetVector3Array(forest, "trees", trees.ToArray());
         }
 
         static Vector2[] Rect4(float minX, float maxX, float minZ, float maxZ) =>

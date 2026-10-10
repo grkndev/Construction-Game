@@ -62,6 +62,8 @@ namespace Game.Editor
                 var so = new SerializedObject(asset);
                 var mobile = path.Contains("Mobile");
                 var changed = SetFloat(so, "m_ShadowDistance", ShadowDistance);
+                // The toon look has no bloom or exposure effects, so HDR only costs fill rate and memory (a half-float colour buffer).
+                changed |= SetInt(so, "m_SupportsHDR", 0);
                 // Spread over a longer distance the maps must stay sharp: PC keeps its 4 cascades, mobile gets 2 at a higher resolution.
                 if (mobile)
                 {

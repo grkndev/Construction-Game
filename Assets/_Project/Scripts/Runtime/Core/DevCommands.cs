@@ -9,7 +9,7 @@ namespace Game.Core
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings (<c>-finishAll</c>: the whole city), <c>-break N</c> gives two of them a problem,
-    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-stats</c> logs how many renderers / triangles are live and how long the first district visit took, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
@@ -30,16 +30,24 @@ namespace Game.Core
             yield return null;   // let GameController.Start build the dashboard first
             if (int.TryParse(LaunchArgs.Value("-xp"), out var xp)) game.Level.Add(xp);
             if (LaunchArgs.Has("-finishAll"))
-                foreach (var d in game.Districts)
-                    foreach (var site in d.Sites) site.AddWork(int.MaxValue / 2, site.transform.position);
+                for (var i = 0; i < game.Districts.Count; i++)
+                {
+                    game.EnsureBuilt(i);
+                    foreach (var site in game.Districts[i].Sites) site.AddWork(int.MaxValue / 2, site.transform.position);
+                }
             if (int.TryParse(LaunchArgs.Value("-finish"), out var finish))
+            {
+                game.EnsureBuilt(finish);
                 foreach (var site in game.Districts[finish].Sites) site.AddWork(int.MaxValue / 2, site.transform.position);
+            }
             if (int.TryParse(LaunchArgs.Value("-break"), out var broken))
             {
                 game.ForceIssue(broken, 0, 1);
                 game.ForceIssue(broken, 1, 3);
             }
+            var visit = System.Diagnostics.Stopwatch.StartNew();
             if (int.TryParse(LaunchArgs.Value("-enter"), out var district)) game.EnterDistrict(district);
+            var visitMs = visit.Elapsed.TotalMilliseconds;
             if (long.TryParse(LaunchArgs.Value("-coins"), out var coins)) game.Economy.Add(coins);   // goes to the district just entered
             var at = LaunchArgs.Value("-at")?.Split(',');
             if (at != null && at.Length == 2 && game.InDistrict
@@ -60,6 +68,7 @@ namespace Game.Core
                 System.Globalization.CultureInfo.InvariantCulture, out var delay);
             yield return new WaitForSeconds(Mathf.Max(1f, delay));
             yield return new WaitForEndOfFrame();
+            if (LaunchArgs.Has("-stats")) LogStats(visitMs);
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
             File.WriteAllBytes(shot, tex.EncodeToPNG());
             var resting = 0;
@@ -71,6 +80,23 @@ namespace Game.Core
             Debug.Log($"[Dev] mode={game.Mode} level={game.Level.Level} xp={game.Level.Xp} characters resting={resting}; {progress}");
             Debug.Log($"[Dev] Saved screenshot {shot} ({tex.width}x{tex.height}), coins={game.Economy.Coins}, cityComplete={game.CityComplete}");
             Application.Quit();
+        }
+
+        // Live cost of the frame on screen: active renderers, how many cast shadows, triangles, and the district visit time.
+        static void LogStats(double visitMs)
+        {
+            var renderers = 0;
+            var casters = 0;
+            long triangles = 0;
+            foreach (var filter in FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+            {
+                var meshRenderer = filter.GetComponent<MeshRenderer>();
+                if (meshRenderer == null || !meshRenderer.enabled || filter.sharedMesh == null) continue;
+                renderers++;
+                if (meshRenderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off) casters++;
+                triangles += filter.sharedMesh.GetIndexCount(0) / 3;
+            }
+            Debug.Log($"[Perf] renderers={renderers} shadowCasters={casters} triangles={triangles} gameObjects={FindObjectsByType<Transform>(FindObjectsSortMode.None).Length} firstVisitMs={visitMs:0.0}");
         }
 
         IEnumerator Demo()
