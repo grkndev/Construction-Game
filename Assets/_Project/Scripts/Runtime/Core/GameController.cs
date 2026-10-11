@@ -154,7 +154,7 @@ namespace Game.Core
             }
 
             // A demo or screenshot run must neither read nor overwrite the player's real save (unless -persist asks for it, to test saving).
-            persist = LaunchArgs.Has("-persist") || (!LaunchArgs.Has("-demo") && LaunchArgs.Value("-shot") == null);
+            persist = LaunchArgs.Has("-persist") || (!LaunchArgs.Has("-demo") && !LaunchArgs.Has("-setup") && LaunchArgs.Value("-shot") == null);
             store = SaveStore.AtDefaultLocation();
             if (persist && LaunchArgs.Has("-reset")) store.Delete();
             ApplySave(persist ? store.Load() : null);

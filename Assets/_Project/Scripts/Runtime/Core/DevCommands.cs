@@ -10,7 +10,8 @@ namespace Game.Core
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings (<c>-finishAll</c>: the whole city), <c>-break N</c> gives two of them a problem,
     /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-ceremony coins|building|level|district|gold|city</c> plays that effect once (use a short <c>-shotDelay</c>), <c>-event chest|birds|pet</c> starts a small event now, <c>-exit</c> returns to the map, <c>-order</c> orders the next decoration, <c>-shoptab decor</c> opens the shop on the decorations tab, <c>-decorate N</c> builds N decorations at once (use with <c>-finish</c>), <c>-workers N</c> / <c>-hammer N</c> buy that many helpers / hammer upgrades (after <c>-coins</c>), <c>-stats</c> logs how many renderers / triangles are live, how long the first district visit took and frame time / batch counters over the last <c>-perfSeconds N</c> (default 5) before the shot, <c>-cascades N</c> / <c>-shadowDist D</c> / <c>-renderScale S</c> override the pipeline's shadows and resolution (to preview the Mobile settings), <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
-    /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
+    /// <c>-setup</c> applies the flags and keeps playing (a development WebGL build reads them from the address: <c>?setup&amp;enter=4&amp;finish=4</c>).
+    /// <c>-demo</c>, <c>-setup</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
     {
@@ -27,7 +28,7 @@ namespace Game.Core
         {
             var shot = LaunchArgs.Value("-shot");
             var demo = LaunchArgs.Has("-demo");
-            if (shot == null && !demo) yield break;
+            if (shot == null && !demo && !LaunchArgs.Has("-setup")) yield break;   // -setup: apply the flags below without taking a shot or quitting (web has no -shot)
             Application.runInBackground = true;   // automated runs must not stall when the window isn't focused
             ApplyQualityOverrides();
             if (float.TryParse(LaunchArgs.Value("-speed"), System.Globalization.NumberStyles.Float,
