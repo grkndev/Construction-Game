@@ -9,7 +9,7 @@ namespace Game.Core
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings (<c>-finishAll</c>: the whole city), <c>-break N</c> gives two of them a problem,
-    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-ceremony coins|building|level|district|gold|city</c> plays that effect once (use a short <c>-shotDelay</c>), <c>-event chest|birds|pet</c> starts a small event now, <c>-exit</c> returns to the map, <c>-order</c> orders the next decoration, <c>-shoptab decor</c> opens the shop on the decorations tab, <c>-decorate N</c> builds N decorations at once (use with <c>-finish</c>), <c>-workers N</c> / <c>-hammer N</c> buy that many helpers / hammer upgrades (after <c>-coins</c>), <c>-stats</c> logs how many renderers / triangles are live, how long the first district visit took and frame time / batch counters over the last <c>-perfSeconds N</c> (default 5) before the shot, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-ceremony coins|building|level|district|gold|city</c> plays that effect once (use a short <c>-shotDelay</c>), <c>-event chest|birds|pet</c> starts a small event now, <c>-exit</c> returns to the map, <c>-order</c> orders the next decoration, <c>-shoptab decor</c> opens the shop on the decorations tab, <c>-decorate N</c> builds N decorations at once (use with <c>-finish</c>), <c>-workers N</c> / <c>-hammer N</c> buy that many helpers / hammer upgrades (after <c>-coins</c>), <c>-stats</c> logs how many renderers / triangles are live, how long the first district visit took and frame time / batch counters over the last <c>-perfSeconds N</c> (default 5) before the shot, <c>-cascades N</c> / <c>-shadowDist D</c> / <c>-renderScale S</c> override the pipeline's shadows and resolution (to preview the Mobile settings), <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
@@ -29,6 +29,7 @@ namespace Game.Core
             var demo = LaunchArgs.Has("-demo");
             if (shot == null && !demo) yield break;
             Application.runInBackground = true;   // automated runs must not stall when the window isn't focused
+            ApplyQualityOverrides();
             if (float.TryParse(LaunchArgs.Value("-speed"), System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var speed) && speed > 0f)
                 Time.timeScale = speed;   // fast-forward long automated runs (the demo plays a whole city)
@@ -158,6 +159,18 @@ namespace Game.Core
             Debug.Log($"[Walkers] count={walkers.Count} overlappingPairs={overlapping} insideSolids={inside} unsticks={unsticks} helpers: " + string.Join(", ", System.Linq.Enumerable.Select(status, kv => $"{kv.Key}={kv.Value}")));
             Debug.Log($"[Perf] renderers={renderers} shadowCasters={casters} triangles={triangles} gameObjects={FindObjectsByType<Transform>(FindObjectsSortMode.None).Length} firstVisitMs={visitMs:0.0}");
             if (sampler != null) Debug.Log("[Frame] " + sampler.Summary());
+        }
+
+        // -cascades N, -shadowDist D and -renderScale S override the pipeline asset's shadows and resolution, to see on a Mac what the Mobile settings
+        // (WebGL, phones) would look like and cost. (Quality levels cannot be switched: the Mobile level is not part of a Mac build.)
+        static void ApplyQualityOverrides()
+        {
+            if (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is not UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp) return;
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            if (int.TryParse(LaunchArgs.Value("-cascades"), out var cascades)) urp.shadowCascadeCount = cascades;
+            if (float.TryParse(LaunchArgs.Value("-shadowDist"), System.Globalization.NumberStyles.Float, invariant, out var distance)) urp.shadowDistance = distance;
+            if (float.TryParse(LaunchArgs.Value("-renderScale"), System.Globalization.NumberStyles.Float, invariant, out var scale)) urp.renderScale = scale;
+            Debug.Log($"[Quality] cascades={urp.shadowCascadeCount} shadowDistance={urp.shadowDistance} renderScale={urp.renderScale}");
         }
 
         IEnumerator Demo()
