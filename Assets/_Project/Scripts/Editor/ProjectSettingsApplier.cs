@@ -36,6 +36,7 @@ namespace Game.Editor
             ApplyWindow();
             ApplyShadows();
             ApplyMobile();
+            ApplySplash();
 
             if (GetActiveInputHandler() != InputSystemOnly)
             {
@@ -116,6 +117,15 @@ namespace Game.Editor
             if (!changed) return;
             AssetDatabase.SaveAssets();
             Debug.Log("[Settings] Mobile: landscape only, status bar and home indicator hidden, iOS bundle id " + IosBundleId);
+        }
+
+        // "Made with Unity" at startup: allowed to switch off on the Education licence (Unity 6 also allows it on Personal).
+        static void ApplySplash()
+        {
+            if (!PlayerSettings.SplashScreen.show) return;
+            PlayerSettings.SplashScreen.show = false;
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Settings] Unity splash screen -> off");
         }
 
         static bool SetFloat(SerializedObject so, string name, float value)
