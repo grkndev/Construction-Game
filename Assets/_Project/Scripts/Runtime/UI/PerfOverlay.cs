@@ -72,8 +72,10 @@ namespace Game.UI
         void OnGUI()
         {
             if (!visible) return;
-            style ??= new GUIStyle(GUI.skin.label) { fontSize = Mathf.Max(14, Screen.height / 40), fontStyle = FontStyle.Bold };
-            var rect = new Rect(Screen.width * 0.5f - 300f, 8f, 600f, style.fontSize * 1.8f);
+            style ??= new GUIStyle(GUI.skin.label) { fontSize = Mathf.Max(14, Screen.height / 40), fontStyle = FontStyle.Bold, wordWrap = false };
+            // Below the camera cut-out / notch: the safe area's top edge (y counts from the bottom of the screen in Screen.safeArea).
+            var top = Screen.height - Screen.safeArea.yMax;
+            var rect = new Rect(Screen.safeArea.center.x - 450f, top + 8f, 900f, style.fontSize * 1.8f);
             GUI.color = new Color(0f, 0f, 0f, 0.6f);
             GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.color = Color.white;

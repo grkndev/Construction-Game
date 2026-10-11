@@ -85,6 +85,7 @@ namespace Game.Editor
         // The game is landscape only; on a phone the status bar and the home indicator stay out of the way (the first swipe from the bottom edge
         // only reveals the indicator, so a thumb sliding over the joystick does not leave the app).
         public const string IosBundleId = "com.gweep.construction";
+        public const string AndroidPackageId = "com.gweep.construction";
 
         static void ApplyMobile()
         {
@@ -105,6 +106,11 @@ namespace Game.Editor
             if (PlayerSettings.GetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.iOS) != IosBundleId)
             {
                 PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.iOS, IosBundleId);
+                changed = true;
+            }
+            if (PlayerSettings.GetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android) != AndroidPackageId)
+            {
+                PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, AndroidPackageId);
                 changed = true;
             }
             if (!changed) return;

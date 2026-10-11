@@ -24,6 +24,10 @@ namespace Game.Editor
         [MenuItem("Tools/Build/iOS (Xcode project)")]
         public static void BuildIOS() => Run(BuildTarget.iOS, "Builds/iOS");
 
+        /// <summary>An APK in Builds/Android (arm64, IL2CPP, signed with the debug keystore) for adb install; <c>-dev</c> makes it a development build.</summary>
+        [MenuItem("Tools/Build/Android (APK)")]
+        public static void BuildAndroid() => Run(BuildTarget.Android, "Builds/Android/Construction.apk");
+
         public static void BuildWindows() => Run(BuildTarget.StandaloneWindows64, "Builds/Windows/Construction.exe");
 
         static void Run(BuildTarget target, string defaultOutput)
@@ -120,6 +124,14 @@ namespace Game.Editor
         {
             switch (target)
             {
+                case BuildTarget.Android:
+                    // Phones only: 64-bit ARM through IL2CPP, an APK (not a bundle: it is installed straight over adb), the highest Android API installed.
+                    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+                    PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                    PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
+                    PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
+                    EditorUserBuildSettings.buildAppBundle = false;
+                    break;
                 case BuildTarget.iOS:
                     PlayerSettings.iOS.sdkVersion = Array.IndexOf(Environment.GetCommandLineArgs(), "-simulator") >= 0 ? iOSSdkVersion.SimulatorSDK : iOSSdkVersion.DeviceSDK;
                     break;

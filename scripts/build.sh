@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds a player in batchmode. Exit code != 0 on any failure.
-# Usage: scripts/build.sh mac|web|ios|win [fast|dev|release|sim]    (fast = mac only: Mono instead of IL2CPP, for quick checks; dev = fast + development player so -stats can read batch counters; release = web only: Brotli + stripping; sim = ios only: Simulator SDK + development player, no flag = device SDK)
+# Usage: scripts/build.sh mac|web|ios|android|win [fast|dev|release|sim]    (fast = mac only: Mono instead of IL2CPP, for quick checks; dev = fast + development player so -stats can read batch counters; release = web only: Brotli + stripping; sim = ios only: Simulator SDK + development player, no flag = device SDK; dev = also works for android)
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
@@ -8,8 +8,9 @@ case "${1:-}" in
   mac) METHOD="Game.Editor.BuildScript.BuildMac" ;;
   web) METHOD="Game.Editor.BuildScript.BuildWeb" ;;
   ios) METHOD="Game.Editor.BuildScript.BuildIOS" ;;
+  android) METHOD="Game.Editor.BuildScript.BuildAndroid" ;;
   win) METHOD="Game.Editor.BuildScript.BuildWindows" ;;
-  *)   die "usage: $0 mac|web|ios|win" ;;
+  *)   die "usage: $0 mac|web|ios|android|win" ;;
 esac
 ensure_editor_closed
 

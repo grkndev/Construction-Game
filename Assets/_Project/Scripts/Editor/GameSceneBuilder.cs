@@ -450,6 +450,7 @@ namespace Game.Editor
 
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Mesh;
+            renderer.enableGPUInstancing = false;   // instanced mesh particles need a compute buffer that Vulkan (Android) did not provide: the draw was skipped
             renderer.mesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             renderer.sharedMaterial = ParticleMaterial();
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
