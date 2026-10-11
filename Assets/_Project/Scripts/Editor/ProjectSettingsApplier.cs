@@ -122,11 +122,22 @@ namespace Game.Editor
         // "Made with Unity" at startup: allowed to switch off on the Education licence (Unity 6 also allows it on Personal).
         static void ApplySplash()
         {
-            if (!PlayerSettings.SplashScreen.show) return;
-            PlayerSettings.SplashScreen.show = false;
-            AssetDatabase.SaveAssets();
-            Debug.Log("[Settings] Unity splash screen -> off");
+            if (PlayerSettings.SplashScreen.show)
+            {
+                PlayerSettings.SplashScreen.show = false;
+                AssetDatabase.SaveAssets();
+                Debug.Log("[Settings] Unity splash screen -> off");
+            }
+            // Our own page template (Assets/WebGLTemplates/Construction): the default one carries the Unity logo twice, in the loading screen and the footer.
+            if (PlayerSettings.WebGL.template != WebGlTemplate)
+            {
+                PlayerSettings.WebGL.template = WebGlTemplate;
+                AssetDatabase.SaveAssets();
+                Debug.Log("[Settings] WebGL template -> " + WebGlTemplate);
+            }
         }
+
+        public const string WebGlTemplate = "PROJECT:Construction";
 
         static bool SetFloat(SerializedObject so, string name, float value)
         {
