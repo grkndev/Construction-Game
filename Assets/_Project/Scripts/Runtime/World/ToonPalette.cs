@@ -13,6 +13,7 @@ namespace Game.World
         [Header("Meshes")]
         public Mesh sphereMesh;      // low-poly stand-ins for the built-in primitives (see LowPolyMeshes / Prim.UseMeshes)
         public Mesh cylinderMesh;
+        public Mesh capsuleMesh;
 
         [Header("Environment")]
         public Material grass;

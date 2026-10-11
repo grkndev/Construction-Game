@@ -7,36 +7,42 @@ namespace Game.World
     /// <summary>
     /// Merges many small primitives into one mesh per material, so a building made of ~70 cubes and cylinders costs a handful of
     /// renderers instead of 70 (less culling, fewer shadow casters, fewer draw calls). Objects that carry colliders, or that the caller
-    /// wants to keep moving on their own (a flag, turning blades), are left alone.
+    /// wants to keep moving on their own (a flag, turning blades), are left alone. Parts that do not cast shadows are merged separately from
+    /// those that do, so the merged mesh casts exactly what its parts did.
     /// </summary>
     public static class MeshCombiner
     {
-        /// <summary>Combines every mesh under <paramref name="root"/> (not root itself); <paramref name="keep"/> marks subtrees to leave untouched.</summary>
-        public static void Combine(Transform root, Func<Transform, bool> keep = null)
+        /// <summary>
+        /// Combines every mesh under <paramref name="root"/> (not root itself); <paramref name="keep"/> marks subtrees to leave untouched.
+        /// Returns the merged renderers with the material each one draws.
+        /// </summary>
+        public static List<(Material material, MeshRenderer renderer)> Combine(Transform root, Func<Transform, bool> keep = null)
         {
-            var groups = new Dictionary<Material, List<CombineInstance>>();
+            var groups = new Dictionary<(Material, bool), List<CombineInstance>>();
             var merged = new List<Transform>();
+            var result = new List<(Material, MeshRenderer)>();
             Collect(root, root, keep, groups, merged);
 
             foreach (var pair in groups)
             {
-                var combined = new Mesh { name = $"Merged {pair.Key.name}" };
-                var vertexCount = 0;
-                foreach (var instance in pair.Value) vertexCount += instance.mesh.vertexCount;
-                if (vertexCount > 65000) combined.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                combined.CombineMeshes(pair.Value.ToArray(), mergeSubMeshes: true, useMatrices: true);
+                var (material, castsShadow) = pair.Key;
+                var combined = MeshMerge.Combine(pair.Value, $"Merged {material.name}");
 
-                var go = new GameObject($"Merged {pair.Key.name}", typeof(MeshFilter), typeof(MeshRenderer));
+                var go = new GameObject($"Merged {material.name}", typeof(MeshFilter), typeof(MeshRenderer));
                 go.transform.SetParent(root, false);
                 go.GetComponent<MeshFilter>().sharedMesh = combined;
-                go.GetComponent<MeshRenderer>().sharedMaterial = pair.Key;
+                var meshRenderer = go.GetComponent<MeshRenderer>();
+                meshRenderer.sharedMaterial = material;
+                if (!castsShadow) meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                result.Add((material, meshRenderer));
             }
 
             foreach (var node in merged) Retire(node);
+            return result;
         }
 
         static void Collect(Transform root, Transform node, Func<Transform, bool> keep,
-            Dictionary<Material, List<CombineInstance>> groups, List<Transform> merged)
+            Dictionary<(Material, bool), List<CombineInstance>> groups, List<Transform> merged)
         {
             for (var i = 0; i < node.childCount; i++)
             {
@@ -47,8 +53,8 @@ namespace Game.World
                 if (filter != null && meshRenderer != null && filter.sharedMesh != null && meshRenderer.sharedMaterial != null
                     && child.GetComponent<Collider>() == null)
                 {
-                    var material = meshRenderer.sharedMaterial;
-                    if (!groups.TryGetValue(material, out var list)) groups[material] = list = new List<CombineInstance>();
+                    var key = (meshRenderer.sharedMaterial, meshRenderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off);
+                    if (!groups.TryGetValue(key, out var list)) groups[key] = list = new List<CombineInstance>();
                     list.Add(new CombineInstance { mesh = filter.sharedMesh, transform = root.worldToLocalMatrix * child.localToWorldMatrix });
                     merged.Add(child);
                 }
@@ -56,12 +62,13 @@ namespace Game.World
             }
         }
 
-        // Removes what was merged: the whole object when nothing else hangs under it, otherwise just its renderer.
+        // Removes what was merged. The renderer and filter go at once (not at the end of the frame): a second merge in the same frame, such as a
+        // finished building fusing right after it was built, must not see the originals still standing next to their merged copy.
         static void Retire(Transform node)
         {
-            if (node.childCount == 0) { Destroy(node.gameObject); return; }
-            Destroy(node.GetComponent<MeshRenderer>());
-            Destroy(node.GetComponent<MeshFilter>());
+            UnityEngine.Object.DestroyImmediate(node.GetComponent<MeshRenderer>());
+            UnityEngine.Object.DestroyImmediate(node.GetComponent<MeshFilter>());
+            if (node.childCount == 0) Destroy(node.gameObject);   // nothing else hangs under it: the empty object goes too
         }
 
         static void Destroy(UnityEngine.Object o)

@@ -111,6 +111,8 @@ namespace Game.UI
 
         // What the polled labels last showed (see Update).
         int lastEnergy = -1, lastEnergyMax = -1, lastBoostKind = -1, lastBoostTenths = -1;
+        float lastBarFraction = -1f;
+        bool lastBarExhausted;
         (Game.World.BuildSite, int, int, int) lastPlateKey = (null, -1, -1, -1);
 
         void Update()
@@ -134,7 +136,12 @@ namespace Game.UI
 
             // Values that change every frame (bars, timers, hit progress) are cheaper to poll than to wire as events.
             var energy = game.PlayerEnergy;
-            SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
+            if (energy.Fraction != lastBarFraction || energy.IsExhausted != lastBarExhausted)
+            {
+                lastBarFraction = energy.Fraction;
+                lastBarExhausted = energy.IsExhausted;
+                SetBar(playerEnergyFill, playerEnergyImage, energy.Fraction, energy.IsExhausted);
+            }
 
             // Only touch text and layout when something visible changed: rebuilding a TMP mesh (and allocating its string) every frame adds up.
             var shown = Mathf.CeilToInt(energy.Value);

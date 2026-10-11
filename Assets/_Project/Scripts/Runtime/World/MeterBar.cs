@@ -23,14 +23,14 @@ namespace Game.World
             root.AddComponent<Billboard>();
             var bar = root.AddComponent<MeterBar>();
 
-            Prim.Cube(root.transform, "Back", Vector3.zero, new Vector3(width, height, 0.06f), back);
+            Prim.NoShadow(Prim.Cube(root.transform, "Back", Vector3.zero, new Vector3(width, height, 0.06f), back));
 
             var innerWidth = width - Padding * 2f;
             bar.fillPivot = new GameObject("FillPivot").transform;
             bar.fillPivot.SetParent(root.transform, false);
             bar.fillPivot.localPosition = new Vector3(-innerWidth * 0.5f, 0f, -0.05f);
-            var fill = Prim.Cube(bar.fillPivot, "Fill", new Vector3(innerWidth * 0.5f, 0f, 0f),
-                new Vector3(innerWidth, height - Padding * 2f, 0.05f), normal);
+            var fill = Prim.NoShadow(Prim.Cube(bar.fillPivot, "Fill", new Vector3(innerWidth * 0.5f, 0f, 0f),
+                new Vector3(innerWidth, height - Padding * 2f, 0.05f), normal));
             bar.fillRenderer = fill.GetComponent<Renderer>();
             bar.normalMaterial = normal;
             bar.lowMaterial = low;
@@ -45,10 +45,24 @@ namespace Game.World
         public void Set(float fraction, bool exhausted)
         {
             fraction = Mathf.Clamp01(fraction);
-            fillPivot.localScale = new Vector3(Mathf.Max(0.0001f, fraction), 1f, 1f);
-            fillRenderer.sharedMaterial = exhausted || fraction < 0.25f ? lowMaterial : normalMaterial;
             var visible = !hideWhenFull || fraction < 0.999f || exhausted;
             if (gameObject.activeSelf != visible) gameObject.SetActive(visible);
+            if (!visible) return;   // nobody sees it: skip the writes (characters call this every frame, most with a full bar)
+
+            if (fraction != lastFraction)
+            {
+                lastFraction = fraction;
+                fillPivot.localScale = new Vector3(Mathf.Max(0.0001f, fraction), 1f, 1f);
+            }
+            var low = exhausted || fraction < 0.25f;
+            if (low != lastLow)
+            {
+                lastLow = low;
+                fillRenderer.sharedMaterial = low ? lowMaterial : normalMaterial;
+            }
         }
+
+        float lastFraction = -1f;
+        bool lastLow;
     }
 }

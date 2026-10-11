@@ -48,8 +48,7 @@ namespace Game.World
         {
             foreach (var pair in chunks)
             {
-                var mesh = new Mesh { name = $"Forest {label} {pair.Key.x},{pair.Key.y}" };
-                mesh.CombineMeshes(pair.Value.ToArray(), mergeSubMeshes: true, useMatrices: true);
+                var mesh = MeshMerge.Combine(pair.Value, $"Forest {label} {pair.Key.x},{pair.Key.y}");
                 var go = new GameObject(mesh.name, typeof(MeshFilter), typeof(MeshRenderer));
                 go.transform.SetParent(transform, false);
                 go.GetComponent<MeshFilter>().sharedMesh = mesh;

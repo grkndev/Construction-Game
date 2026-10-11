@@ -175,6 +175,7 @@ namespace Game.Editor
 
             palette.sphereMesh = SaveMesh("LowPolySphere", LowPolyMeshes.CreateSphere("LowPolySphere"));
             palette.cylinderMesh = SaveMesh("LowPolyCylinder", LowPolyMeshes.CreateCylinder("LowPolyCylinder"));
+            palette.capsuleMesh = SaveMesh("LowPolyCapsule", LowPolyMeshes.CreateCapsule("LowPolyCapsule"));
 
             palette.grass = Mat("Grass", "#86DB5B", 0.003f);
             palette.dirt = Mat("Dirt", "#D79C66", 0f);
@@ -264,10 +265,10 @@ namespace Game.Editor
             Prim.Sphere(body, "Head", new Vector3(0f, 1.38f, 0f), new Vector3(0.78f, 0.74f, 0.78f), p.skin);
             Prim.Sphere(body, "Hat", new Vector3(0f, 1.63f, 0f), new Vector3(0.84f, 0.5f, 0.84f), p.hat);
             Prim.Cylinder(body, "HatBrim", new Vector3(0f, 1.5f, 0.05f), new Vector3(0.95f, 0.035f, 0.95f), p.hat);
-            Prim.Sphere(body, "EyeL", new Vector3(-0.15f, 1.4f, 0.34f), new Vector3(0.1f, 0.13f, 0.08f), p.eye);
-            Prim.Sphere(body, "EyeR", new Vector3(0.15f, 1.4f, 0.34f), new Vector3(0.1f, 0.13f, 0.08f), p.eye);
-            Prim.Sphere(body, "FootL", new Vector3(-0.2f, 0.08f, 0.1f), new Vector3(0.3f, 0.18f, 0.42f), p.hammerHandle);
-            Prim.Sphere(body, "FootR", new Vector3(0.2f, 0.08f, 0.1f), new Vector3(0.3f, 0.18f, 0.42f), p.hammerHandle);
+            Prim.NoShadow(Prim.Sphere(body, "EyeL", new Vector3(-0.15f, 1.4f, 0.34f), new Vector3(0.1f, 0.13f, 0.08f), p.eye));
+            Prim.NoShadow(Prim.Sphere(body, "EyeR", new Vector3(0.15f, 1.4f, 0.34f), new Vector3(0.1f, 0.13f, 0.08f), p.eye));
+            Prim.NoShadow(Prim.Sphere(body, "FootL", new Vector3(-0.2f, 0.08f, 0.1f), new Vector3(0.3f, 0.18f, 0.42f), p.hammerHandle));
+            Prim.NoShadow(Prim.Sphere(body, "FootR", new Vector3(0.2f, 0.08f, 0.1f), new Vector3(0.3f, 0.18f, 0.42f), p.hammerHandle));
 
             var pivot = new GameObject("HammerPivot").transform;
             pivot.SetParent(root.transform, false);
@@ -278,8 +279,8 @@ namespace Game.Editor
             Prim.Cube(pivot, "Head", new Vector3(0f, 0.9f, 0f), new Vector3(0.28f, 0.3f, 0.58f), p.hammerHead);
 
             // Golden ring that shows while the cola level bonus is active (hidden by default).
-            var aura = Prim.Cylinder(root.transform, "Aura", new Vector3(0f, 0.03f, 0f), new Vector3(1.5f, 0.015f, 1.5f), p.marker);
-            Prim.Cube(aura.transform, "Notch", new Vector3(0f, 0f, 0.5f), new Vector3(0.18f, 2.2f, 0.12f), p.flag);   // makes the spin visible
+            var aura = Prim.NoShadow(Prim.Cylinder(root.transform, "Aura", new Vector3(0f, 0.03f, 0f), new Vector3(1.5f, 0.015f, 1.5f), p.marker));
+            Prim.NoShadow(Prim.Cube(aura.transform, "Notch", new Vector3(0f, 0f, 0.5f), new Vector3(0.18f, 2.2f, 0.12f), p.flag));   // makes the spin visible
             aura.SetActive(false);
 
             var visual = root.AddComponent<WorkerVisual>();

@@ -53,7 +53,7 @@ namespace Game.Editor
             var outlineMat = ArtBuilder.EnsureOutlineMaterial(font);
             ArtBuilder.EnsurePrefabs(palette, font, outlineMat, force: true);   // Rebuild regenerates prefabs too
 
-            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh);   // everything below is made of the low-poly sphere/cylinder
+            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh, palette.capsuleMesh);   // everything below is made of the low-poly sphere/cylinder
             BuildLight();
             BuildSea(palette);
 
@@ -134,7 +134,7 @@ namespace Game.Editor
         static void BuildSea(ToonPalette p)
         {
             var sea = new GameObject("Sea").transform;
-            Prim.Cube(sea, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(700f, 0.2f, 700f), p.sea);
+            Prim.NoShadow(Prim.Cube(sea, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(700f, 0.2f, 700f), p.sea));
         }
 
         // Sides of the play square: 0 = +x, 1 = -x, 2 = +z, 3 = -z. Sahil is on the sea at +x and Liman at +z (the far edges, so the water
@@ -163,7 +163,7 @@ namespace Game.Editor
             var inset = Rect4(-limit[1] + (coast == 1 ? 1.2f : 0f), limit[0] - (coast == 0 ? 1.2f : 0f), -limit[3] + (coast == 3 ? 1.2f : 0f), limit[2] - (coast == 2 ? 1.2f : 0f));
             MeshPart(t, "IslandBase", IslandMeshBuilder.Prism($"District{index + 1}Base", inset, -2.5f, -0.5f), p.dirt);
             MeshPart(t, "IslandTop", IslandMeshBuilder.Prism($"District{index + 1}Top", top, -0.5f, 0f), p.districtGround[index]);
-            Prim.Cube(t, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(1600f, 0.2f, 1600f), p.sea);
+            Prim.NoShadow(Prim.Cube(t, "Water", new Vector3(0f, -2.2f, 0f), new Vector3(1600f, 0.2f, 1600f), p.sea));
             var ground = new GameObject("GroundCollider");
             ground.transform.SetParent(t, false);
             ground.transform.localPosition = new Vector3(0f, -0.5f, 0f);
@@ -199,6 +199,9 @@ namespace Game.Editor
             // Inside the fence: a few trees, rocks, cones and crates between the plots.
             var random = new System.Random(index * 31 + 7);
             float Rand(float lo, float hi) => lo + (float)random.NextDouble() * (hi - lo);
+            var props = new GameObject("Scenery").transform;
+            props.SetParent(t, false);
+            props.gameObject.AddComponent<MergeChildren>();   // trees, rocks, crates and cones become a handful of meshes on first use
             var scenery = 0;
             for (var attempt = 0; attempt < 400 && scenery < 26; attempt++)
             {
@@ -206,17 +209,19 @@ namespace Game.Editor
                 if (!Free(spot, 1.2f)) continue;
                 switch (scenery % 6)
                 {
-                    case 0: case 3: BuildTree(t, spot, Rand(0.85f, 1.1f), p); break;
-                    case 1: Prim.Sphere(t, "Rock", spot + Vector3.up * 0.15f, new Vector3(1.1f, 0.65f, 0.9f), p.stone).transform.Rotate(0f, Rand(0f, 180f), 0f); break;
+                    case 0: case 3: BuildTree(props, spot, Rand(0.85f, 1.1f), p); break;
+                    case 1: Prim.Sphere(props, "Rock", spot + Vector3.up * 0.15f, new Vector3(1.1f, 0.65f, 0.9f), p.stone).transform.Rotate(0f, Rand(0f, 180f), 0f); break;
                     case 2:
-                        Prim.Cube(t, "Crate", spot + Vector3.up * 0.45f, Vector3.one * 0.9f, p.crate, true);
-                        Prim.Cube(t, "Crate", spot + new Vector3(0.9f, 0.45f, 0.3f), Vector3.one * 0.9f, p.crate, true).transform.Rotate(0f, 20f, 0f);
-                        Prim.Cube(t, "Crate", spot + new Vector3(0.3f, 1.35f, 0.1f), Vector3.one * 0.9f, p.crate).transform.Rotate(0f, 10f, 0f);
+                        Prim.SplitCollider(Prim.Cube(props, "Crate", spot + Vector3.up * 0.45f, Vector3.one * 0.9f, p.crate, true));
+                        var tilted = Prim.Cube(props, "Crate", spot + new Vector3(0.9f, 0.45f, 0.3f), Vector3.one * 0.9f, p.crate, true);
+                        tilted.transform.Rotate(0f, 20f, 0f);
+                        Prim.SplitCollider(tilted);   // after turning it: the collider twin copies the final pose
+                        Prim.Cube(props, "Crate", spot + new Vector3(0.3f, 1.35f, 0.1f), Vector3.one * 0.9f, p.crate).transform.Rotate(0f, 10f, 0f);
                         break;
                     default:
-                        Prim.Cylinder(t, "ConeBase", spot + Vector3.up * 0.04f, new Vector3(0.55f, 0.04f, 0.55f), p.cone);
-                        Prim.Cylinder(t, "ConeBody", spot + Vector3.up * 0.35f, new Vector3(0.3f, 0.3f, 0.3f), p.cone, true);
-                        Prim.Cylinder(t, "ConeTip", spot + Vector3.up * 0.7f, new Vector3(0.18f, 0.08f, 0.18f), p.cone);
+                        Prim.Cylinder(props, "ConeBase", spot + Vector3.up * 0.04f, new Vector3(0.55f, 0.04f, 0.55f), p.cone);
+                        Prim.SplitCollider(Prim.Cylinder(props, "ConeBody", spot + Vector3.up * 0.35f, new Vector3(0.3f, 0.3f, 0.3f), p.cone, true));
+                        Prim.Cylinder(props, "ConeTip", spot + Vector3.up * 0.7f, new Vector3(0.18f, 0.08f, 0.18f), p.cone);
                         break;
                 }
                 scenery++;
@@ -299,6 +304,7 @@ namespace Game.Editor
             go.transform.SetParent(parent, false);
             go.GetComponent<MeshFilter>().sharedMesh = mesh;
             go.GetComponent<MeshRenderer>().sharedMaterial = material;
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // ground slabs: nothing to see in their shadow
             return go;
         }
 
@@ -329,11 +335,12 @@ namespace Game.Editor
             world.localRotation = Quaternion.Euler(0f, -outwardDegrees, 0f);
             world.localScale = Vector3.one * scale;
             var solid = !onLand;   // landmarks in the district are solid; on the map they are only a picture
+            world.gameObject.AddComponent<MergeChildren>();   // its dozen parts become one mesh per colour on first use (solid parts keep their colliders)
 
             switch (index)
             {
                 case 0:   // Sahil: beach umbrella and a rowing boat on the water
-                    Prim.Cylinder(world, "Pole", new Vector3(0f, 1.1f, 0f), new Vector3(0.08f, 1.1f, 0.08f), p.scaffold, solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "Pole", new Vector3(0f, 1.1f, 0f), new Vector3(0.08f, 1.1f, 0.08f), p.scaffold, solid));
                     Prim.Sphere(world, "Canopy", new Vector3(0f, 2.2f, 0f), new Vector3(2.4f, 0.7f, 2.4f), p.roof);
                     if (onLand) break;
                     Prim.Cube(world, "Hull", new Vector3(3.6f, -1.75f, 0f), new Vector3(2.8f, 0.5f, 1.2f), p.crate);
@@ -341,7 +348,7 @@ namespace Game.Editor
                     Prim.Cube(world, "Sail", new Vector3(3.6f, -0.7f, 0f), new Vector3(0.05f, 1.0f, 0.9f), p.flag);
                     break;
                 case 1:   // Merkez: fountain
-                    Prim.Cylinder(world, "Basin", new Vector3(0f, 0.25f, 0f), new Vector3(3.2f, 0.25f, 3.2f), p.stone, solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "Basin", new Vector3(0f, 0.25f, 0f), new Vector3(3.2f, 0.25f, 3.2f), p.stone, solid));
                     Prim.Cylinder(world, "Water", new Vector3(0f, 0.52f, 0f), new Vector3(2.7f, 0.02f, 2.7f), p.sea);
                     Prim.Cylinder(world, "Pillar", new Vector3(0f, 1.2f, 0f), new Vector3(0.45f, 0.8f, 0.45f), p.stone);
                     Prim.Sphere(world, "Drop", new Vector3(0f, 2.2f, 0f), Vector3.one * 0.7f, p.window);
@@ -353,12 +360,12 @@ namespace Game.Editor
                         Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, 0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
                         Prim.Cylinder(world, "Piling", new Vector3(6.2f, -0.9f, -0.9f), new Vector3(0.25f, 1.2f, 0.25f), p.trunk);
                     }
-                    Prim.Cylinder(world, "CraneMast", new Vector3(0f, 2.2f, 1.8f), new Vector3(0.3f, 2.2f, 0.3f), p.cone, solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "CraneMast", new Vector3(0f, 2.2f, 1.8f), new Vector3(0.3f, 2.2f, 0.3f), p.cone, solid));
                     Prim.Cube(world, "CraneArm", new Vector3(1.4f, 4.3f, 1.8f), new Vector3(3.6f, 0.3f, 0.3f), p.cone);
                     Prim.Cube(world, "Hook", new Vector3(2.8f, 3.5f, 1.8f), new Vector3(0.1f, 1.4f, 0.1f), p.scaffold);
                     break;
                 case 3:   // Tepe: windmill
-                    Prim.Cylinder(world, "Tower", new Vector3(0f, 1.8f, 0f), new Vector3(1.6f, 1.8f, 1.6f), p.walls[1], solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "Tower", new Vector3(0f, 1.8f, 0f), new Vector3(1.6f, 1.8f, 1.6f), p.walls[1], solid));
                     Prim.Cylinder(world, "Cap", new Vector3(0f, 3.8f, 0f), new Vector3(1.9f, 0.2f, 1.9f), p.roof);
                     var hub = new GameObject("Blades").transform;
                     hub.SetParent(world, false);
@@ -368,9 +375,9 @@ namespace Game.Editor
                     Prim.Cube(hub, "BladeB", Vector3.zero, new Vector3(0.12f, 0.45f, 3.6f), p.door);
                     break;
                 default:  // Sanayi: chimney and a storage tank
-                    Prim.Cylinder(world, "Chimney", new Vector3(0f, 3f, 0f), new Vector3(1.2f, 3f, 1.2f), p.stone, solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "Chimney", new Vector3(0f, 3f, 0f), new Vector3(1.2f, 3f, 1.2f), p.stone, solid));
                     Prim.Cylinder(world, "Band", new Vector3(0f, 5.6f, 0f), new Vector3(1.3f, 0.35f, 1.3f), p.roof);
-                    Prim.Cylinder(world, "Tank", new Vector3(3f, 1.1f, 0f), new Vector3(2.2f, 1.1f, 2.2f), p.hammerHead, solid);
+                    Prim.SplitCollider(Prim.Cylinder(world, "Tank", new Vector3(3f, 1.1f, 0f), new Vector3(2.2f, 1.1f, 2.2f), p.hammerHead, solid));
                     Prim.Sphere(world, "TankTop", new Vector3(3f, 2.2f, 0f), new Vector3(2.2f, 0.9f, 2.2f), p.hammerHead);
                     break;
             }
@@ -382,7 +389,8 @@ namespace Game.Editor
             tree.SetParent(parent, false);
             tree.localPosition = pos;
             tree.localScale = Vector3.one * scale;
-            Prim.Cylinder(tree, "Trunk", new Vector3(0f, 0.7f, 0f), new Vector3(0.4f, 0.7f, 0.4f), p.trunk, collider);
+            var trunk = Prim.Cylinder(tree, "Trunk", new Vector3(0f, 0.7f, 0f), new Vector3(0.4f, 0.7f, 0.4f), p.trunk, collider);
+            if (collider) Prim.SplitCollider(trunk);   // so the trunk can merge with the other props
             Prim.Sphere(tree, "LeavesLow", new Vector3(0f, 1.9f, 0f), Vector3.one * 2.3f, p.leaves);
             Prim.Sphere(tree, "LeavesHigh", new Vector3(0.1f, 2.9f, 0.05f), Vector3.one * 1.6f, p.leaves);
         }
@@ -397,7 +405,7 @@ namespace Game.Editor
             go.transform.localPosition = localPosition;
 
             var yard = YardSize(plan);
-            var dirt = Prim.Cylinder(go.transform, "Ground", new Vector3(0f, 0.015f, 0f), new Vector3(yard.x, 0.015f, yard.y), palette.dirt);
+            var dirt = Prim.NoShadow(Prim.Cylinder(go.transform, "Ground", new Vector3(0f, 0.015f, 0f), new Vector3(yard.x, 0.015f, yard.y), palette.dirt));
             dirt.transform.SetParent(go.transform, false);
 
             var site = go.AddComponent<BuildSite>();

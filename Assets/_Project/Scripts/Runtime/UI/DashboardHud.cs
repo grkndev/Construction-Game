@@ -88,7 +88,8 @@ namespace Game.UI
             for (var i = 0; i < cards.Length; i++)
             {
                 var world = game.Districts[i].MapPoint + Vector3.up * CardHeightAboveGround;
-                cards[i].Rect.position = cam.WorldToScreenPoint(world);
+                var screen = cam.WorldToScreenPoint(world);
+                if (cards[i].Rect.position != screen) cards[i].Rect.position = screen;   // the map camera is still: a write would re-layout the canvas for nothing
             }
         }
     }

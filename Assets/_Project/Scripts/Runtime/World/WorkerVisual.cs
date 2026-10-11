@@ -25,14 +25,25 @@ namespace Game.World
         Core.IdleEmote emote;
         float emoteTime;
         int hops;                 // hops left in a cheer (Cheer() sets several)
-        float restAngle = -35f;   // hammer angle while idle (smoothed)
+        float restAngle = RestHammerAngle;   // hammer angle while idle (smoothed)
         Vector3 bodyBasePos;
 
         Transform hammerHead;
         Vector3 hammerHeadBaseScale;
+        MeshRenderer shirtRenderer, hatRenderer;   // the merged body parts that SetLook recolours
 
         void Awake()
         {
+            // The body is eight little primitives; one mesh per colour draws the same figure with a third fewer draws (and shadow casters).
+            var shirt = PartMaterial("Torso");
+            var hat = PartMaterial("Hat");
+            foreach (var (material, meshRenderer) in MeshCombiner.Combine(body))
+            {
+                if (material == shirt) shirtRenderer = meshRenderer;
+                if (material == hat) hatRenderer = meshRenderer;
+            }
+            if (shirtRenderer == hatRenderer) shirtRenderer = hatRenderer = null;   // the same colour in one mesh cannot be recoloured apart: keep the original outfit
+
             bodyBasePos = body.localPosition;
             hammerHead = hammerPivot.Find("Head");
             if (hammerHead != null) hammerHeadBaseScale = hammerHead.localScale;
@@ -52,16 +63,14 @@ namespace Game.World
         /// <summary>Gives a helper their own shirt and hat colour (null keeps the original).</summary>
         public void SetLook(Material shirt, Material hat)
         {
-            Paint("Torso", shirt);
-            Paint("Hat", hat);
-            Paint("HatBrim", hat);
+            if (shirt != null && shirtRenderer != null) shirtRenderer.sharedMaterial = shirt;
+            if (hat != null && hatRenderer != null) hatRenderer.sharedMaterial = hat;
         }
 
-        void Paint(string part, Material material)
+        Material PartMaterial(string part)
         {
-            if (material == null) return;
             var found = body.Find(part);
-            if (found != null) found.GetComponent<Renderer>().sharedMaterial = material;
+            return found != null ? found.GetComponent<Renderer>().sharedMaterial : null;
         }
 
         /// <summary>0 = standing, 1 = full speed.</summary>
@@ -96,13 +105,38 @@ namespace Game.World
         /// <summary>Shows the golden ring while the temporary level bonus is on.</summary>
         public void SetBuffed(bool value) => isBuffed = value;
 
+        const float RestHammerAngle = -35f;
+        bool restPosed;   // the standing pose has been written; nothing to do until something moves again
+
+        // Standing still, not tired, no gesture, no swing, no glowing ring and the smoothed values have settled: the pose would come out identical every frame.
+        bool AtRest() =>
+            move < 0.002f && emote == Core.IdleEmote.None && swingTime < 0f && !isTired && tired < 0.002f && !isBuffed
+            && (aura == null || !aura.gameObject.activeSelf)
+            && Mathf.Abs(restAngle - RestHammerAngle) < 0.05f && Mathf.Abs(leanSmooth) < 0.05f;
+
         void Update()
         {
+            // Most characters stand around most of the time (waiting for work, resting); skip the whole pose maths for them.
+            if (AtRest())
+            {
+                if (!restPosed)
+                {
+                    restPosed = true;
+                    move = 0f; tired = 0f; leanSmooth = 0f; restAngle = RestHammerAngle;
+                    body.localPosition = bodyBasePos;
+                    body.localScale = Vector3.one;
+                    body.localRotation = Quaternion.identity;
+                    hammerPivot.localRotation = Quaternion.Euler(RestHammerAngle, 0f, 0f);
+                }
+                return;
+            }
+            restPosed = false;
+
             if (move > 0.25f && emote != Core.IdleEmote.None && emote != Core.IdleEmote.Hop) emote = Core.IdleEmote.None;   // walking ends a rest or a look
 
             var hop = 0f;
             var look = 0f;
-            var targetRest = -35f;
+            var targetRest = RestHammerAngle;
             if (emote != Core.IdleEmote.None)
             {
                 emoteTime += Time.deltaTime;

@@ -141,7 +141,7 @@ namespace Game.Core
 
         void Awake()
         {
-            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh);   // low-poly spheres and cylinders for everything built from here on
+            Prim.UseMeshes(palette.sphereMesh, palette.cylinderMesh, palette.capsuleMesh);   // low-poly spheres and cylinders for everything built from here on
             if (Application.isMobilePlatform) Application.targetFrameRate = 60;   // phones default to 30
             playerController = player.GetComponent<PlayerController>();
 
@@ -662,7 +662,7 @@ namespace Game.Core
         public void BuyHammer()
         {
             if (!InDistrict || !Hammer.TryBuy(Economy)) return;
-            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);   // a bigger hammer for everyone
+            EachCharacter(ApplyEffectsTo);   // a bigger hammer for everyone
             HammerUpgraded?.Invoke(player.transform.position);
             ShowHint($"Çekiç güçlendi! Vuruş: {HammerPower}");
             Sfx?.Invoke(SfxKind.Buy);
@@ -681,7 +681,7 @@ namespace Game.Core
         public void BuyStamina()
         {
             if (!InDistrict || !Stamina.TryBuy(Economy)) return;
-            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.ApplyStamina(Stamina.Level);
+            EachCharacter(character => character.ApplyStamina(Stamina.Level));
             var hits = Balance.HitsPerBar(Balance.PlayerEnergy, Stamina.Level);
             ShowHint($"Dayanıklılık arttı! Bir dolu enerji artık {hits} vuruş, herkes daha çabuk toparlanıyor.");
             Sfx?.Invoke(SfxKind.Buy);
@@ -692,7 +692,7 @@ namespace Game.Core
         public void BuySpeed()
         {
             if (!InDistrict || !Speed.TryBuy(Economy)) return;
-            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);
+            EachCharacter(ApplyEffectsTo);
             var percent = Mathf.RoundToInt((Balance.SpeedMultiplier(Speed.Level) - 1f) * 100f);
             ShowHint($"Hız arttı! Herkes %{percent} daha hızlı yürüyor, vuruyor ve toparlanıyor.");
             Sfx?.Invoke(SfxKind.Buy);
@@ -746,7 +746,7 @@ namespace Game.Core
         // Pushes the current cola effects to every character; also called when a new worker is hired.
         void OnBuffsChanged()
         {
-            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) ApplyEffectsTo(character);
+            EachCharacter(ApplyEffectsTo);
             StateChanged?.Invoke();
         }
 
@@ -760,8 +760,14 @@ namespace Game.Core
 
         void RefillEnergy()
         {
-            // Found at call time on purpose: workers are hired during play and no registry is needed.
-            foreach (var character in FindObjectsByType<Character>(FindObjectsSortMode.None)) character.Refill();
+            EachCharacter(character => character.Refill());
+        }
+
+        // The player and every hired helper (the only characters there are).
+        void EachCharacter(Action<Character> action)
+        {
+            action(player);
+            foreach (var worker in workers) if (worker != null) action(worker.GetComponent<Character>());
         }
 
         public void ToggleShop() => ShopToggleRequested?.Invoke();

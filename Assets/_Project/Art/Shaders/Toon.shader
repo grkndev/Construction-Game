@@ -102,6 +102,7 @@ Shader "Construction/Toon"
             struct Attributes
             {
                 float4 positionOS : POSITION;
+                float4 outlineDirOS : TEXCOORD1;   // merged meshes carry the direction each vertex had in its own primitive in xyz, with w = 2 as the marker (World/MeshMerge)
             };
 
             struct Varyings
@@ -116,7 +117,10 @@ Shader "Construction/Toon"
 
                 // Primitives are centred on their pivot, so "away from the centre" is a smooth outline
                 // direction even for cubes, whose real normals are split per face (that would open gaps).
-                float3 dirWS = TransformObjectToWorldDir(normalize(IN.positionOS.xyz), false);
+                // A merged mesh has no such centre: it brings the direction in UV1. Plain primitives may have a UV1 of their own (lightmap
+                // coordinates), so the marker in w tells the two apart.
+                float3 dirOS = IN.outlineDirOS.w > 1.5 ? IN.outlineDirOS.xyz : IN.positionOS.xyz;
+                float3 dirWS = TransformObjectToWorldDir(normalize(dirOS), false);
                 float2 dirCS = mul((float3x3)UNITY_MATRIX_VP, dirWS).xy;
                 dirCS = normalize(dirCS + 1e-5);
                 dirCS.x *= _ScreenParams.y / _ScreenParams.x;   // keep width uniform on wide screens

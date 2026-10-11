@@ -64,6 +64,9 @@ namespace Game.Editor
                 var changed = SetFloat(so, "m_ShadowDistance", ShadowDistance);
                 // The toon look has no bloom or exposure effects, so HDR only costs fill rate and memory (a half-float colour buffer).
                 changed |= SetInt(so, "m_SupportsHDR", 0);
+                // No shader reads the camera's depth or opaque texture, so URP would only spend a copy pass on them (the PC asset had both on).
+                changed |= SetInt(so, "m_RequireDepthTexture", 0);
+                changed |= SetInt(so, "m_RequireOpaqueTexture", 0);
                 // Spread over a longer distance the maps must stay sharp: PC keeps its 4 cascades, mobile gets 2 at a higher resolution.
                 if (mobile)
                 {

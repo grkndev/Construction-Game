@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Game.World
 {
     /// <summary>
-    /// Smooth-shaded low-poly stand-ins for Unity's built-in sphere (768 triangles) and cylinder: with an outline pass, shadow cascades and
-    /// hundreds of trees those triangles add up. Same dimensions as the built-ins (sphere diameter 1, cylinder diameter 1 and height 2), so
+    /// Smooth-shaded low-poly stand-ins for Unity's built-in sphere (768 triangles), capsule (832) and cylinder: with an outline pass, shadow cascades and
+    /// hundreds of trees those triangles add up. Same dimensions as the built-ins (sphere diameter 1, cylinder diameter 1 and height 2, capsule diameter 1 and height 2), so
     /// <see cref="Prim"/> can swap them in without touching any layout.
     /// </summary>
     public static class LowPolyMeshes
@@ -36,6 +36,40 @@ namespace Game.World
                 var b = a + stride;
                 if (ring > 0) AddFacing(vertices, normals, triangles, a, b, a + 1);                      // not at the top pole
                 if (ring < SphereRings - 1) AddFacing(vertices, normals, triangles, a + 1, b, b + 1);    // not at the bottom pole
+            }
+            return Build(name, vertices, normals, triangles);
+        }
+
+        public const int CapsuleCapRings = 4;
+
+        public static Mesh CreateCapsule(string name = "LowPolyCapsule")
+        {
+            var vertices = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var triangles = new List<int>();
+            // Two hemispheres (radius 0.5) joined by a straight band of height 1; the equator ring appears twice, once per half.
+            var rings = 0;
+            foreach (var top in new[] { true, false })
+            for (var i = 0; i <= CapsuleCapRings; i++)
+            {
+                var theta = Mathf.PI * 0.5f * (top ? i : CapsuleCapRings + i) / CapsuleCapRings;
+                for (var seg = 0; seg <= SphereSegments; seg++)
+                {
+                    var phi = 2f * Mathf.PI * seg / SphereSegments;
+                    var n = new Vector3(Mathf.Sin(theta) * Mathf.Cos(phi), Mathf.Cos(theta), Mathf.Sin(theta) * Mathf.Sin(phi));
+                    vertices.Add(n * 0.5f + Vector3.up * (top ? 0.5f : -0.5f));
+                    normals.Add(n);
+                }
+                rings++;
+            }
+            var stride = SphereSegments + 1;
+            for (var ring = 0; ring < rings - 1; ring++)
+            for (var seg = 0; seg < SphereSegments; seg++)
+            {
+                var a = ring * stride + seg;
+                var b = a + stride;
+                if (ring > 0) AddFacing(vertices, normals, triangles, a, b, a + 1);                      // not at the top pole
+                if (ring < rings - 2) AddFacing(vertices, normals, triangles, a + 1, b, b + 1);          // not at the bottom pole
             }
             return Build(name, vertices, normals, triangles);
         }

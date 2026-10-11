@@ -61,18 +61,19 @@ namespace Game.World
             block.center = new Vector3(0f, 1.2f, 0f);
             block.size = new Vector3(5.4f, 2.4f, 5.4f);
             foreach (var r in scaffold.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            MeshCombiner.Combine(scaffold.transform);
 
             // Progress bar floating over the middle, always facing the camera.
             var barRoot = new GameObject("ProgressBar").transform;
             barRoot.SetParent(transform, false);
             barRoot.localPosition = new Vector3(0f, 4.4f, 0f);
             barRoot.gameObject.AddComponent<Billboard>();
-            Prim.Cube(barRoot, "Back", Vector3.zero, new Vector3(3.2f, 0.34f, 0.08f), palette.barBack);
+            Prim.NoShadow(Prim.Cube(barRoot, "Back", Vector3.zero, new Vector3(3.2f, 0.34f, 0.08f), palette.barBack));
             var pivot = new GameObject("FillPivot").transform;
             pivot.SetParent(barRoot, false);
             pivot.localPosition = new Vector3(-1.45f, 0f, -0.06f);
             bar = pivot;
-            Prim.Cube(pivot, "Fill", new Vector3(1.45f, 0f, 0f), new Vector3(2.9f, 0.2f, 0.06f), palette.barFill);
+            Prim.NoShadow(Prim.Cube(pivot, "Fill", new Vector3(1.45f, 0f, 0f), new Vector3(2.9f, 0.2f, 0.06f), palette.barFill));
         }
 
         /// <summary>0..1.</summary>

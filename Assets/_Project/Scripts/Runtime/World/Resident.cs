@@ -61,9 +61,9 @@ namespace Game.World
             alert.transform.SetParent(transform, false);
             alert.transform.localPosition = new Vector3(0f, 2.4f, 0f);
             alert.AddComponent<Billboard>();
-            Prim.Sphere(alert.transform, "Bubble", Vector3.zero, Vector3.one * 0.7f, p.roof);
-            Prim.Cube(alert.transform, "Bar", new Vector3(0f, 0.08f, -0.3f), new Vector3(0.1f, 0.3f, 0.06f), p.window);
-            Prim.Cube(alert.transform, "Dot", new Vector3(0f, -0.18f, -0.3f), new Vector3(0.1f, 0.1f, 0.06f), p.window);
+            Prim.NoShadow(Prim.Sphere(alert.transform, "Bubble", Vector3.zero, Vector3.one * 0.7f, p.roof));
+            Prim.NoShadow(Prim.Cube(alert.transform, "Bar", new Vector3(0f, 0.08f, -0.3f), new Vector3(0.1f, 0.3f, 0.06f), p.window));
+            Prim.NoShadow(Prim.Cube(alert.transform, "Dot", new Vector3(0f, -0.18f, -0.3f), new Vector3(0.1f, 0.1f, 0.06f), p.window));
             alert.SetActive(false);
         }
 

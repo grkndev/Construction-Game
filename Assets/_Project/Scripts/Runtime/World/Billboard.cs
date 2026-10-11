@@ -15,7 +15,10 @@ namespace Game.World
                 if (main == null) return;
                 cam = main.transform;
             }
-            transform.rotation = cam.rotation;
+            // Only write when it differs: a bar on a standing character already faces the camera, and a write dirties the transform.
+            // (Compared with the real rotation, not a cached one: the parent turns, which turns the bar with it.)
+            var rotation = cam.rotation;
+            if (transform.rotation != rotation) transform.rotation = rotation;
         }
     }
 }

@@ -114,14 +114,28 @@ namespace Game.Core
             var renderers = 0;
             var casters = 0;
             long triangles = 0;
+            var groups = new System.Collections.Generic.Dictionary<string, (int renderers, int casters)>();
             foreach (var filter in FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
             {
                 var meshRenderer = filter.GetComponent<MeshRenderer>();
                 if (meshRenderer == null || !meshRenderer.enabled || filter.sharedMesh == null) continue;
                 renderers++;
-                if (meshRenderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off) casters++;
+                var casts = meshRenderer.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.Off;
+                if (casts) casters++;
                 triangles += filter.sharedMesh.GetIndexCount(0) / 3;
+
+                // Where the draws come from: the part of a district that owns it ("Plot", "Forest"...) or the stand-alone object ("AutoWorker").
+                var top = filter.transform.root;
+                var owner = top.name.StartsWith("District") && filter.transform != top ? filter.transform.parent == top ? filter.transform : filter.transform.parent : top;
+                while (owner.parent != null && owner.parent != top && top.name.StartsWith("District")) owner = owner.parent;
+                var key = owner.name.Replace("(Clone)", "").Split(' ')[0];
+                groups.TryGetValue(key, out var entry);
+                groups[key] = (entry.renderers + 1, entry.casters + (casts ? 1 : 0));
             }
+            var breakdown = new System.Collections.Generic.List<string>();
+            foreach (var pair in groups) breakdown.Add($"{pair.Key}={pair.Value.renderers}/{pair.Value.casters}");
+            breakdown.Sort();
+            Debug.Log("[Perf] renderers/shadowCasters by owner: " + string.Join(" ", breakdown));
             // Walkers (helpers, villagers, strays) must not overlap each other or stand inside a solid structure.
             var walkers = new System.Collections.Generic.List<Transform>();
             foreach (var w in FindObjectsByType<Game.World.AutoWorker>(FindObjectsSortMode.None)) walkers.Add(w.transform);

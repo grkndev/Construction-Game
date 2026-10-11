@@ -29,6 +29,8 @@ namespace Game.World
         SiteState state;
 
         Transform body;                 // everything that squashes when hit
+        Transform model;                // the building itself (slab, floors, roof), scaled by the plan's size
+        bool fused;                     // a finished building's stages have been merged into one set of meshes
         Vector2 footprint;              // x/z size of the finished building, world units
         Transform barRoot, barFill, marker;
         TMP_Text label;
@@ -89,13 +91,37 @@ namespace Game.World
             if (!progress.IsComplete) return;
             roof.gameObject.SetActive(true);
             SetState(SiteState.Done);
+            FuseFinished();
+        }
+
+        // A finished building never changes again, so its slab, floors and roof (merged separately so they could pop in one by one) become one
+        // mesh per colour: a 25-draw building is then ~6. The flag (it droops when broken) and any turning blades stay separate.
+        void FuseFinished()
+        {
+            if (fused || model == null) return;
+            fused = true;
+            foreach (var floor in floors) floor.localScale = Vector3.one;   // never bake a pop-in that was cut short
+            roof.localScale = Vector3.one;
+            MeshCombiner.Combine(model, t => t == flag || t.GetComponent<Spin>() != null);
+        }
+
+        // The pop-in coroutine stops when a district is hidden: if a building was finished and left in the middle of it, tidy up on return.
+        void OnEnable()
+        {
+            if (state != SiteState.Active && IsComplete) FuseFinished();
+        }
+
+        IEnumerator FuseAfterPop()
+        {
+            yield return new WaitForSeconds(1f);   // the roof's pop-in takes 0.6 s
+            FuseFinished();
         }
 
         void Build()
         {
             body = new GameObject("Body").transform;
             body.SetParent(transform, false);
-            var model = new GameObject("Model").transform;
+            model = new GameObject("Model").transform;
             model.SetParent(body, false);
             model.localScale = Vector3.one * plan.Size;
 
@@ -143,6 +169,7 @@ namespace Game.World
             // Thin poles cast long, noisy shadow lines across the island; the scaffold reads fine without them.
             foreach (var r in scaffold.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            MeshCombiner.Combine(scaffold.transform);   // eight poles and rails: one mesh
         }
 
         void BuildBar()
@@ -153,12 +180,12 @@ namespace Game.World
             barRoot.localPosition = new Vector3(-(footprint.x * 0.5f + 0.6f), 4.9f, -(footprint.y * 0.5f + 0.6f));
             barRoot.gameObject.AddComponent<Billboard>();
 
-            Prim.Cube(barRoot, "Back", Vector3.zero, new Vector3(3.2f, 0.34f, 0.08f), palette.barBack);
+            Prim.NoShadow(Prim.Cube(barRoot, "Back", Vector3.zero, new Vector3(3.2f, 0.34f, 0.08f), palette.barBack));
             var pivot = new GameObject("FillPivot").transform;
             pivot.SetParent(barRoot, false);
             pivot.localPosition = new Vector3(-1.45f, 0f, -0.06f);
             barFill = pivot;
-            Prim.Cube(pivot, "Fill", new Vector3(1.45f, 0f, 0f), new Vector3(2.9f, 0.2f, 0.06f), palette.barFill);
+            Prim.NoShadow(Prim.Cube(pivot, "Fill", new Vector3(1.45f, 0f, 0f), new Vector3(2.9f, 0.2f, 0.06f), palette.barFill));
 
             if (label != null)
             {
@@ -167,7 +194,7 @@ namespace Game.World
                 label.text = plan.Name;
             }
 
-            marker = Prim.Cube(barRoot, "Marker", new Vector3(0f, 1.5f, 0f), new Vector3(0.5f, 0.5f, 0.5f), palette.marker).transform;
+            marker = Prim.NoShadow(Prim.Cube(barRoot, "Marker", new Vector3(0f, 1.5f, 0f), new Vector3(0.5f, 0.5f, 0.5f), palette.marker)).transform;
             markerRenderer = marker.GetComponent<Renderer>();
             marker.localRotation = Quaternion.Euler(45f, 0f, 45f);
             SetBarFraction(0f);
@@ -284,6 +311,7 @@ namespace Game.World
             StartCoroutine(PopIn(roof, 0.6f));
             if (completeFx != null) completeFx.Play();
             SetState(SiteState.Done);
+            StartCoroutine(FuseAfterPop());
             Completed?.Invoke(this);
         }
 
@@ -303,10 +331,14 @@ namespace Game.World
         {
             if (body == null) return;
 
-            // Squash-and-stretch reaction to each hammer hit, around the base of the building.
-            punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
-            var s = Mathf.Sin(punch * Mathf.PI);
-            body.localScale = new Vector3(1f + s * 0.05f, 1f - s * 0.06f, 1f + s * 0.05f);
+            // Squash-and-stretch reaction to each hammer hit, around the base of the building. Only while it plays: rewriting the scale every frame
+            // of every idle building dirties its transform (and so its bounds and renderer data) for nothing.
+            if (punch > 0f)
+            {
+                punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
+                var s = Mathf.Sin(punch * Mathf.PI);
+                body.localScale = new Vector3(1f + s * 0.05f, 1f - s * 0.06f, 1f + s * 0.05f);
+            }
 
             if (barPulse > 0f)
             {
