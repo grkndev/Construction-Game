@@ -9,13 +9,19 @@ namespace Game.Core
     /// <c>-shot &lt;file.png&gt;</c> saves the game's own frame (only our window, never the desktop) after
     /// <c>-shotDelay &lt;seconds&gt;</c> and quits; <c>-demo</c> auto-plays (visits every district in turn, stands next to
     /// the active plot so the player hammers automatically, buys upgrades); <c>-enter N</c> opens district N, <c>-finish N</c> completes district N's buildings (<c>-finishAll</c>: the whole city), <c>-break N</c> gives two of them a problem,
-    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-ceremony coins|building|level|district|gold|city</c> plays that effect once (use a short <c>-shotDelay</c>), <c>-event chest|birds|pet</c> starts a small event now, <c>-exit</c> returns to the map, <c>-order</c> orders the next decoration, <c>-shoptab decor</c> opens the shop on the decorations tab, <c>-decorate N</c> builds N decorations at once (use with <c>-finish</c>), <c>-workers N</c> / <c>-hammer N</c> buy that many helpers / hammer upgrades (after <c>-coins</c>), <c>-stats</c> logs how many renderers / triangles are live and how long the first district visit took, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
+    /// <c>-xp N</c> / <c>-coins N</c> grant XP / coins (to the entered district), <c>-shop</c> opens the shop panel, <c>-settings</c> the settings window, <c>-ceremony coins|building|level|district|gold|city</c> plays that effect once (use a short <c>-shotDelay</c>), <c>-event chest|birds|pet</c> starts a small event now, <c>-exit</c> returns to the map, <c>-order</c> orders the next decoration, <c>-shoptab decor</c> opens the shop on the decorations tab, <c>-decorate N</c> builds N decorations at once (use with <c>-finish</c>), <c>-workers N</c> / <c>-hammer N</c> buy that many helpers / hammer upgrades (after <c>-coins</c>), <c>-stats</c> logs how many renderers / triangles are live, how long the first district visit took and frame time / batch counters over the last <c>-perfSeconds N</c> (default 5) before the shot, <c>-at x,z</c> drops the player at that offset from the district centre (the walkable area pulls them back inside).
     /// <c>-demo</c> and <c>-shot</c> never touch the real save file unless <c>-persist</c> is passed (see <see cref="GameController"/>).
     /// </summary>
     public sealed class DevCommands : MonoBehaviour
     {
         [SerializeField] GameController game;
         [SerializeField] Game.World.Character player;
+
+        PerfSampler sampler;   // -stats: frame times and render counters over the last -perfSeconds before the shot
+
+        void Update() => sampler?.Sample();
+
+        void OnDestroy() => sampler?.Dispose();
 
         IEnumerator Start()
         {
@@ -76,7 +82,17 @@ namespace Game.Core
             if (shot == null) yield break;
             float.TryParse(LaunchArgs.Value("-shotDelay"), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var delay);
-            yield return new WaitForSeconds(Mathf.Max(0.2f, delay));   // short delays catch effects mid-flight
+            delay = Mathf.Max(0.2f, delay);   // short delays catch effects mid-flight
+            if (LaunchArgs.Has("-stats"))
+            {
+                float.TryParse(LaunchArgs.Value("-perfSeconds"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var window);
+                window = Mathf.Min(window > 0f ? window : 5f, delay);
+                yield return new WaitForSeconds(delay - window);
+                sampler = new PerfSampler();
+                yield return new WaitForSeconds(window);
+            }
+            else yield return new WaitForSeconds(delay);
             yield return new WaitForEndOfFrame();
             if (LaunchArgs.Has("-stats")) LogStats(visitMs);
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
@@ -127,6 +143,7 @@ namespace Game.Core
             if (game.InDistrict) Debug.Log($"[Decor] built={game.Decorations.Built} ordered={game.Decorations.Ordered} progress={game.Decorations.Progress:0.00}");
             Debug.Log($"[Walkers] count={walkers.Count} overlappingPairs={overlapping} insideSolids={inside} unsticks={unsticks} helpers: " + string.Join(", ", System.Linq.Enumerable.Select(status, kv => $"{kv.Key}={kv.Value}")));
             Debug.Log($"[Perf] renderers={renderers} shadowCasters={casters} triangles={triangles} gameObjects={FindObjectsByType<Transform>(FindObjectsSortMode.None).Length} firstVisitMs={visitMs:0.0}");
+            if (sampler != null) Debug.Log("[Frame] " + sampler.Summary());
         }
 
         IEnumerator Demo()

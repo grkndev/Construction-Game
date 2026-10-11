@@ -77,7 +77,8 @@ namespace Game.Editor
                 locationPathName = output,
                 target = target,
                 targetGroup = group,
-                options = BuildOptions.None,
+                // -dev: a development player, the only kind that exposes the renderer's counters (batches, SetPass) to -stats.
+                options = Array.IndexOf(Environment.GetCommandLineArgs(), "-dev") >= 0 ? BuildOptions.Development : BuildOptions.None,
             };
             var report = BuildPipeline.BuildPlayer(options);
             var summary = report.summary;
