@@ -10,7 +10,7 @@ namespace Game.Editor
 {
     /// <summary>
     /// Batchmode build entry points used by scripts/build.sh.
-    /// Optional args: <c>-outputPath &lt;path&gt;</c>, <c>-mono</c> (macOS quick build), <c>-release</c> (WebGL: compressed and stripped). The process exit code reflects the build result.
+    /// Optional args: <c>-outputPath &lt;path&gt;</c>, <c>-mono</c> (macOS quick build), <c>-release</c> (WebGL: compressed and stripped), <c>-dev</c> (development player), <c>-simulator</c> (iOS Simulator SDK). The process exit code reflects the build result.
     /// </summary>
     public static class BuildScript
     {
@@ -19,6 +19,10 @@ namespace Game.Editor
 
         [MenuItem("Tools/Build/WebGL")]
         public static void BuildWeb() => Run(BuildTarget.WebGL, "Builds/WebGL");
+
+        /// <summary>An Xcode project in Builds/iOS. <c>-simulator</c> targets the iOS Simulator (Apple silicon) instead of a device.</summary>
+        [MenuItem("Tools/Build/iOS (Xcode project)")]
+        public static void BuildIOS() => Run(BuildTarget.iOS, "Builds/iOS");
 
         public static void BuildWindows() => Run(BuildTarget.StandaloneWindows64, "Builds/Windows/Construction.exe");
 
@@ -54,7 +58,7 @@ namespace Game.Editor
             }
 
             // Release settings are applied for this build only: they would otherwise stay in ProjectSettings and leak into every later dev build.
-            var restore = target == BuildTarget.WebGL ? SnapshotWebGlSettings() : null;
+            var restore = target == BuildTarget.WebGL ? SnapshotWebGlSettings() : target == BuildTarget.iOS ? SnapshotIosSettings() : null;
             try
             {
                 ConfigurePlatform(target);
@@ -68,7 +72,7 @@ namespace Game.Editor
 
         static int BuildPlayer(BuildTarget target, BuildTargetGroup group, string[] scenes, string output)
         {
-            var dir = target == BuildTarget.WebGL ? output : Path.GetDirectoryName(output);
+            var dir = target == BuildTarget.WebGL || target == BuildTarget.iOS ? output : Path.GetDirectoryName(output);   // those two build into a folder
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
             var options = new BuildPlayerOptions
@@ -105,10 +109,20 @@ namespace Game.Editor
             };
         }
 
+        // The simulator and device SDKs are chosen per build; put the player setting back so a device build is not left on the simulator SDK.
+        static Action SnapshotIosSettings()
+        {
+            var sdk = PlayerSettings.iOS.sdkVersion;
+            return () => PlayerSettings.iOS.sdkVersion = sdk;
+        }
+
         static void ConfigurePlatform(BuildTarget target)
         {
             switch (target)
             {
+                case BuildTarget.iOS:
+                    PlayerSettings.iOS.sdkVersion = Array.IndexOf(Environment.GetCommandLineArgs(), "-simulator") >= 0 ? iOSSdkVersion.SimulatorSDK : iOSSdkVersion.DeviceSDK;
+                    break;
                 case BuildTarget.StandaloneOSX:
                     // macOS: IL2CPP, Universal (Intel + Apple Silicon). "-mono" is a ~5x faster build for quick
                     // visual checks only; release builds must not pass it.

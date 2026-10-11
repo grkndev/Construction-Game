@@ -47,10 +47,12 @@ namespace Game.UI
             if (dir.sqrMagnitude < 1e-6f) dir = Vector2.up;
             dir.Normalize();
 
-            var halfW = Screen.width * (0.5f - EdgeMarginX);
-            var halfH = Screen.height * (0.5f - EdgeMarginY);
+            // Around the middle of the safe area (not the whole screen), so the arrow never hides under a notch or the home indicator.
+            var safe = Screen.safeArea;
+            var halfW = safe.width * (0.5f - EdgeMarginX);
+            var halfH = safe.height * (0.5f - EdgeMarginY);
             var t = Mathf.Min(Mathf.Abs(dir.x) > 1e-4f ? halfW / Mathf.Abs(dir.x) : float.MaxValue, Mathf.Abs(dir.y) > 1e-4f ? halfH / Mathf.Abs(dir.y) : float.MaxValue);
-            root.position = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f) + dir * t;
+            root.position = safe.center + dir * t;
             arrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f);
             root.localScale = Vector3.one * (1f + 0.08f * Mathf.Sin(Time.unscaledTime * 6f));
 

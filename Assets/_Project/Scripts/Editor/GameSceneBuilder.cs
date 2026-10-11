@@ -657,7 +657,13 @@ namespace Game.Editor
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
-            var root = canvasGo.transform;
+            // Everything lives under the safe area (notch, Dynamic Island, home indicator); only the fade covers the whole canvas.
+            var safeArea = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaFitter)).GetComponent<RectTransform>();
+            safeArea.SetParent(canvasGo.transform, false);
+            safeArea.anchorMin = Vector2.zero;
+            safeArea.anchorMax = Vector2.one;
+            safeArea.offsetMin = safeArea.offsetMax = Vector2.zero;
+            var root = (Transform)safeArea;
 
             var rounded = ArtBuilder.EnsureRoundedSprite();   // plain dark plates for on-screen messages
             var kit = UiKitBuilder.Panel;
@@ -746,7 +752,7 @@ namespace Game.Editor
             EditorWire.Set(hud, "playerEnergyImage", playerFillImage);
 
             // Covers every view change (map <-> district); last in the canvas so it is above everything, never blocks taps.
-            var fadeRt = Rect(root, "Fade", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var fadeRt = Rect(canvasGo.transform, "Fade", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             Stretch(fadeRt, 0f, 0f);
             var fadeImage = fadeRt.gameObject.AddComponent<Image>();
             fadeImage.color = new Color(0.12f, 0.09f, 0.22f, 1f);

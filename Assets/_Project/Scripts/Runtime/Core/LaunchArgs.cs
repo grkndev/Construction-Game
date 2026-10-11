@@ -14,6 +14,15 @@ namespace Game.Core
         static string[] Read()
         {
             var args = Environment.GetCommandLineArgs();
+            // A phone build gets no usable command line: CONSTRUCTION_ARGS="-fps -enter 4" in the environment (the Xcode scheme, or
+            // SIMCTL_CHILD_CONSTRUCTION_ARGS with scripts/run-ios-sim.sh) stands in for it.
+            var fromEnvironment = Environment.GetEnvironmentVariable("CONSTRUCTION_ARGS");
+            if (!string.IsNullOrWhiteSpace(fromEnvironment))
+            {
+                var combined = new List<string>(args);
+                combined.AddRange(fromEnvironment.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+                args = combined.ToArray();
+            }
 #if UNITY_WEBGL && !UNITY_EDITOR
             var url = UnityEngine.Application.absoluteURL;
             var query = url.IndexOf('?');

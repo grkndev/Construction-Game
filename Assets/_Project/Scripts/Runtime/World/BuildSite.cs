@@ -301,17 +301,17 @@ namespace Game.World
         {
             var floor = floors[floorNumber - 1];
             floor.gameObject.SetActive(true);
-            StartCoroutine(PopIn(floor, 0.5f));
+            if (isActiveAndEnabled) StartCoroutine(PopIn(floor, 0.5f));   // finished by a dev flag while the district is hidden: no animation to play
             FloorBuilt?.Invoke(this, floorNumber);
         }
 
         void OnCompleted()
         {
             roof.gameObject.SetActive(true);
-            StartCoroutine(PopIn(roof, 0.6f));
+            if (isActiveAndEnabled) StartCoroutine(PopIn(roof, 0.6f));
             if (completeFx != null) completeFx.Play();
             SetState(SiteState.Done);
-            StartCoroutine(FuseAfterPop());
+            if (isActiveAndEnabled) StartCoroutine(FuseAfterPop());   // a hidden plot fuses in OnEnable instead
             Completed?.Invoke(this);
         }
 

@@ -35,6 +35,7 @@ namespace Game.Editor
 
             ApplyWindow();
             ApplyShadows();
+            ApplyMobile();
 
             if (GetActiveInputHandler() != InputSystemOnly)
             {
@@ -79,6 +80,36 @@ namespace Game.Editor
                 AssetDatabase.SaveAssets();
                 Debug.Log($"[Settings] {path}: shadow distance {ShadowDistance}");
             }
+        }
+
+        // The game is landscape only; on a phone the status bar and the home indicator stay out of the way (the first swipe from the bottom edge
+        // only reveals the indicator, so a thumb sliding over the joystick does not leave the app).
+        public const string IosBundleId = "com.gweep.construction";
+
+        static void ApplyMobile()
+        {
+            var changed = false;
+            if (PlayerSettings.defaultInterfaceOrientation != UIOrientation.AutoRotation) { PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation; changed = true; }
+            if (PlayerSettings.allowedAutorotateToPortrait || PlayerSettings.allowedAutorotateToPortraitUpsideDown
+                || !PlayerSettings.allowedAutorotateToLandscapeLeft || !PlayerSettings.allowedAutorotateToLandscapeRight)
+            {
+                PlayerSettings.allowedAutorotateToPortrait = false;
+                PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+                PlayerSettings.allowedAutorotateToLandscapeLeft = true;
+                PlayerSettings.allowedAutorotateToLandscapeRight = true;
+                changed = true;
+            }
+            if (!PlayerSettings.statusBarHidden) { PlayerSettings.statusBarHidden = true; changed = true; }
+            if (!PlayerSettings.iOS.hideHomeButton) { PlayerSettings.iOS.hideHomeButton = true; changed = true; }
+            if (PlayerSettings.iOS.deferSystemGesturesMode != UnityEngine.iOS.SystemGestureDeferMode.BottomEdge) { PlayerSettings.iOS.deferSystemGesturesMode = UnityEngine.iOS.SystemGestureDeferMode.BottomEdge; changed = true; }
+            if (PlayerSettings.GetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.iOS) != IosBundleId)
+            {
+                PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.iOS, IosBundleId);
+                changed = true;
+            }
+            if (!changed) return;
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Settings] Mobile: landscape only, status bar and home indicator hidden, iOS bundle id " + IosBundleId);
         }
 
         static bool SetFloat(SerializedObject so, string name, float value)
